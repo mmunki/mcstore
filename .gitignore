@@ -1,0 +1,13 @@
+.gradle/
+build/
+run/
+out/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+# never commit downloaded servers, Fabric API jars or release output
+build/smoke/
+*.log
+# keep the Gradle wrapper jar in version control
+!gradle/wrapper/gradle-wrapper.jar

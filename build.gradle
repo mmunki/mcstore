@@ -1,0 +1,56 @@
+plugins {
+    id 'java'
+    id 'net.fabricmc.fabric-loom' version '1.19.3'
+}
+
+group = 'dev.mmunki'
+version = '26.2'
+
+base {
+    archivesName = 'mcstore'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:26.2"
+    implementation "net.fabricmc:fabric-loader:0.20.1"
+    implementation "net.fabricmc.fabric-api:fabric-api:0.161.0+26.2"
+    implementation "com.google.code.gson:gson:2.14.0"
+
+    testImplementation platform("org.junit:junit-bom:5.13.4")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+def releaseJar = tasks.named('jar', Jar) {
+    archiveFileName = "MCStore-${project.version}.jar"
+}
+
+tasks.register('lowercaseJar', Copy) {
+    dependsOn releaseJar
+    from(releaseJar.flatMap { it.archiveFile })
+    into(layout.buildDirectory.dir('libs'))
+    rename { "mcstore-${project.version}.jar" }
+}
+
+tasks.named('build') {
+    dependsOn 'lowercaseJar'
+}
