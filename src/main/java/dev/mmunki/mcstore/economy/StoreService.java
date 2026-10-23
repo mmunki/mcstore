@@ -3,13 +3,14 @@ package dev.mmunki.mcstore.economy;
 import dev.mmunki.mcstore.McStore;
 import dev.mmunki.mcstore.config.PriceBook;
 import dev.mmunki.mcstore.config.PriceEntry;
+import dev.mmunki.mcstore.market.MarketQuote;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.LinkedHashMap;
@@ -37,10 +38,17 @@ public final class StoreService {
             player.sendSystemMessage(error("Unknown item: " + itemId));
             return false;
         }
+        MarketQuote quote = store.quote(entry);
         int quantity = Math.max(1, amount);
         ItemStack stack = new ItemStack(item, quantity);
         quantity = stack.getCount();
-        long cost = Math.multiplyExact(entry.buyCents(), quantity);
+        if (quote.stock() < quantity) {
+            player.sendSystemMessage(error("Only " + quote.stock() + "x " + displayName(stack)
+                    + " left in stock. The market restocks in "
+                    + McStore.formatDuration(store.secondsUntilRestock()) + "."));
+            return false;
+        }
+        long cost = Math.multiplyExact(quote.buyCents(), (long) quantity);
         long balance = store.balances().balance(player.getUUID());
         if (balance < cost) {
             player.sendSystemMessage(error("Not enough money. That costs " + Money.format(cost)
@@ -56,14 +64,22 @@ public final class StoreService {
             player.sendSystemMessage(error("Not enough money."));
             return false;
         }
+        int removed = store.stocks().consume(itemId, quantity, quote.capacity());
+        if (removed < quantity) {
+            store.balances().add(player.getUUID(), cost);
+            player.sendSystemMessage(error("The market could not fill that order. The purchase was refunded."));
+            return false;
+        }
         if (!player.getInventory().add(stack)) {
             store.balances().add(player.getUUID(), cost);
+            store.stocks().add(itemId, removed, quote.capacity());
             player.sendSystemMessage(error("Your inventory is full. The purchase was refunded."));
             return false;
         }
         player.sendSystemMessage(success("Bought " + quantity + "x " + displayName(stack)
-                + " for " + Money.format(cost) + ". Balance: "
-                + Money.format(store.balances().balance(player.getUUID()))));
+                + " at " + Money.format(quote.buyCents()) + " each for " + Money.format(cost)
+                + ". Stock left: " + quote.stock() + " -> " + (quote.stock() - quantity)
+                + " · Balance: " + Money.format(store.balances().balance(player.getUUID()))));
         return true;
     }
 
@@ -74,23 +90,33 @@ public final class StoreService {
             player.sendSystemMessage(error("MCStore does not buy that item."));
             return false;
         }
+        MarketQuote quote = store.quote(entry);
+        if (quote.availableToSell() <= 0) {
+            player.sendSystemMessage(error("The store is fully stocked with " + prettyId(itemId)
+                    + " and is not buying more right now."));
+            return false;
+        }
         int available = countItem(player, itemId);
         if (available < 1) {
             player.sendSystemMessage(error("You do not have " + prettyId(itemId) + " in your inventory."));
             return false;
         }
         int amount = amountOrAll <= 0 ? available : Math.min(amountOrAll, available);
+        amount = Math.min(amount, quote.availableToSell());
         int removed = removeItem(player, itemId, amount);
         if (removed < 1) {
             player.sendSystemMessage(error("You do not have enough of that item."));
             return false;
         }
-        long earned = Math.multiplyExact(entry.sellCents(), removed);
+        int added = store.stocks().add(itemId, removed, quote.capacity());
+        long earned = Math.multiplyExact(quote.sellCents(), (long) added);
         store.balances().add(player.getUUID(), earned);
         ItemStack sample = stack(itemId);
         String name = sample == null ? prettyId(itemId) : displayName(sample);
-        player.sendSystemMessage(success("Sold " + removed + "x " + name + " for " + Money.format(earned)
-                + ". Balance: " + Money.format(store.balances().balance(player.getUUID()))));
+        player.sendSystemMessage(success("Sold " + added + "x " + name + " at "
+                + Money.format(quote.sellCents()) + " each for " + Money.format(earned)
+                + ". Store stock: " + quote.stock() + " -> " + (quote.stock() + added)
+                + " · Balance: " + Money.format(store.balances().balance(player.getUUID()))));
         return true;
     }
 
@@ -128,14 +154,21 @@ public final class StoreService {
             if (price == null) {
                 continue;
             }
-            int removed = removeItem(player, entry.getKey(), entry.getValue());
+            MarketQuote quote = store.quote(price);
+            int space = quote.availableToSell();
+            if (space <= 0) {
+                continue;
+            }
+            int wanted = Math.min(entry.getValue(), space);
+            int removed = removeItem(player, entry.getKey(), wanted);
             if (removed > 0) {
-                total = Math.addExact(total, Math.multiplyExact(price.sellCents(), removed));
-                totalItems += removed;
+                int added = store.stocks().add(entry.getKey(), removed, quote.capacity());
+                total = Math.addExact(total, Math.multiplyExact(quote.sellCents(), (long) added));
+                totalItems += added;
             }
         }
         if (totalItems == 0) {
-            player.sendSystemMessage(error("Nothing in your inventory can be sold."));
+            player.sendSystemMessage(error("Everything you can sell is already fully stocked at the store."));
             return false;
         }
         store.balances().add(player.getUUID(), total);

@@ -35,7 +35,8 @@ public final class ItemClassifier {
             "amethyst_shard", "amethyst_block",
             "ancient_debris", "netherite_scrap", "netherite_ingot", "netherite_block",
             "sulfur", "potent_sulfur", "cinnabar",
-            "glowstone_dust", "glowstone"
+            "glowstone_dust", "glowstone",
+            "money_ore"
     );
 
     private static final Map<String, RarityTier> RARITY_OVERRIDES = Map.ofEntries(
@@ -53,6 +54,7 @@ public final class ItemClassifier {
             Map.entry("ancient_debris", RarityTier.EPIC),
             Map.entry("netherite_scrap", RarityTier.EPIC),
             Map.entry("diamond", RarityTier.RARE),
+            Map.entry("money_ore", RarityTier.RARE),
             Map.entry("diamond_block", RarityTier.EPIC),
             Map.entry("emerald", RarityTier.RARE),
             Map.entry("emerald_block", RarityTier.EPIC),

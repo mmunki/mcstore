@@ -23,7 +23,7 @@ fi
 JAVA_VERSION="$("$JAVA" -version 2>&1 | awk -F'"' '/version/ {print $2; exit}')"
 JAVA_MAJOR="${JAVA_VERSION%%.*}"
 if [ "$JAVA_MAJOR" -ne 25 ]; then
-    echo "error: MCStore 26.2.1 needs Java 25, found $JAVA_VERSION ($JAVA)" >&2
+    echo "error: MCStore 26.2.2 needs Java 25, found $JAVA_VERSION ($JAVA)" >&2
     exit 1
 fi
 
@@ -38,7 +38,7 @@ mkdir -p "$SMOKE" "$CACHE" "$SERVER"
 
 echo "==> building MCStore"
 "$ROOT/gradlew" --no-daemon --console=plain build
-JAR="$ROOT/build/libs/MCStore-26.2.1.jar"
+JAR="$ROOT/build/libs/MCStore-26.2.2.jar"
 [ -s "$JAR" ] || {
     echo "error: build did not produce $JAR" >&2
     exit 1
@@ -87,7 +87,7 @@ fi
 rm -rf "$SERVER/mods" "$SERVER/config/mcstore" "$SERVER/world" \
        "$SERVER/logs" "$SERVER/crash-reports" "$LOG"
 mkdir -p "$SERVER/mods"
-cp "$JAR" "$SERVER/mods/MCStore-26.2.1.jar"
+cp "$JAR" "$SERVER/mods/MCStore-26.2.2.jar"
 cp "$API" "$SERVER/mods/fabric-api-0.161.0+26.2.jar"
 
 printf 'eula=true\n' > "$SERVER/eula.txt"
@@ -155,6 +155,15 @@ def send(command):
 commands = [
     "mcstore",
     "buy",
+    "stock minecraft:diamond",
+    "mcstore stock minecraft:diamond",
+    "mcstore restock",
+    "forceload add 0 0",
+    "setblock 0 100 0 mcstore:money_ore",
+    "setblock 0 100 0 minecraft:air",
+    "forceload remove 0 0",
+    "execute in minecraft:the_nether run forceload add -32 -32 32 32",
+    "execute in minecraft:the_nether run forceload remove -32 -32 32 32",
     "mcstore setprice minecraft:diamond sell 55.00",
     "mcstore setprice diamond buy 123.00",
     "mcstore reload",
@@ -212,24 +221,31 @@ PY
 echo "==> verifying the smoke test"
 
 python3 - "$SERVER" "$LOG" <<'PY'
+import glob
+import gzip
 import json
 import os
 import re
 import sys
+import zlib
 
 server, log_path = sys.argv[1], sys.argv[2]
 text = open(log_path, encoding="utf-8").read()
 
 required = [
     "Loading Minecraft 26.2 with Fabric Loader 0.20.1",
-    "MCStore 26.2.1 loaded (client + server, singleplayer worlds supported)",
-    "MCStore 26.2.1 initialized on Minecraft 26.2 (Fabric)",
-    "MCStore commands registered: /buy /sell /balance /mcstore",
+    "MCStore 26.2.2 loaded (client + server, singleplayer worlds supported",
+    "MCStore 26.2.2 initialized on Minecraft 26.2 (Fabric)",
+    "MCStore commands registered: /buy /sell /exchange /stock /balance /mcstore",
+    "MCStore market: stock caps",
     "Coverage target 80%: PASS",
     "Only a player can open the store.",
+    "Stock minecraft:diamond: 64/64",
+    "MCStore market restocked",
+    "Changed the block at 0, 100, 0",
     "Set sell price of minecraft:diamond to 55.00",
     "Set buy price of minecraft:diamond to 123.00",
-    "MCStore reloaded prices.json and config.json.",
+    "MCStore reloaded prices.json, stocks.json and config.json.",
     "Done (",
 ]
 for marker in required:
@@ -238,14 +254,15 @@ for marker in required:
         print(text[-8000:], file=sys.stderr)
         raise SystemExit(1)
 
-for bad in ("Failed to start the minecraft server", "Exception while loading entries"):
+for bad in ("Failed to start the minecraft server", "Exception while loading entries",
+            "Failed to load registries", "Couldn't parse", "Unknown block type"):
     if bad in text:
         print("ERROR: " + bad, file=sys.stderr)
         print(text[-8000:], file=sys.stderr)
         raise SystemExit(1)
 
 config_dir = os.path.join(server, "config", "mcstore")
-for name in ("config.json", "prices.json", "balances.json", "admins.json"):
+for name in ("config.json", "prices.json", "balances.json", "stocks.json", "admins.json"):
     path = os.path.join(config_dir, name)
     if not os.path.isfile(path) or os.path.getsize(path) < 2:
         print("MISSING config file: " + path, file=sys.stderr)
@@ -261,6 +278,50 @@ if abs(float(entry.get("buy", -1)) - 123.0) > 0.0001:
     print("diamond buy price was not persisted: " + repr(entry), file=sys.stderr)
     raise SystemExit(1)
 
+def region_contains(path, needle=b"mcstore:money_ore"):
+    with open(path, "rb") as handle:
+        header = handle.read(8192)
+        if len(header) < 8192:
+            return False
+        for index in range(1024):
+            offset = int.from_bytes(header[index * 4:index * 4 + 3], "big")
+            if offset == 0:
+                continue
+            handle.seek(offset * 4096)
+            length_bytes = handle.read(4)
+            if len(length_bytes) < 4:
+                continue
+            length = int.from_bytes(length_bytes, "big")
+            compression = handle.read(1)
+            data = handle.read(max(0, length - 1))
+            try:
+                if compression == b"\x01":
+                    raw = gzip.decompress(data)
+                elif compression == b"\x02":
+                    raw = zlib.decompress(data)
+                elif compression == b"\x03":
+                    raw = data
+                else:
+                    continue
+            except Exception:
+                continue
+            if needle in raw:
+                return True
+    return False
+
+def dimension_has_money_ore(dimension):
+    pattern = os.path.join(server, "world", "dimensions", "minecraft", dimension, "region", "*.mca")
+    return any(region_contains(path) for path in glob.glob(pattern))
+
+overworld_ore = dimension_has_money_ore("overworld")
+nether_ore = dimension_has_money_ore("the_nether")
+if not overworld_ore:
+    print("money ore was not generated in the overworld", file=sys.stderr)
+    raise SystemExit(1)
+if not nether_ore:
+    print("money ore was not generated in the nether", file=sys.stderr)
+    raise SystemExit(1)
+
 match = re.search(
     r"MCStore prices (?:generated|loaded) \((\d+) default entries\), "
     r"(\d+) sellable of (\d+) filtered items \((\d+)%\), "
@@ -274,7 +335,7 @@ if not match:
 defaults, sellable, filtered, filtered_pct, registry_priced, registry_total, registry_pct, buyable = match.groups()
 summary = (
     "status: passed\n"
-    "mod: 26.2.1\n"
+    "mod: 26.2.2\n"
     "minecraft: 26.2\n"
     "fabric-loader: 0.20.1\n"
     "fabric-api: 0.161.0+26.2\n"
@@ -282,6 +343,12 @@ summary = (
     f"sellable-filtered: {sellable} of {filtered} ({filtered_pct}%)\n"
     f"registry-covered: {registry_priced} of {registry_total} ({registry_pct}%)\n"
     f"buyable: {buyable}\n"
+    "stock-system: passed\n"
+    "stock-cap-diamond: 64/64\n"
+    "xp-exchange-rate: 1.00 per level\n"
+    "money-ore-block: registered\n"
+    "money-ore-overworld: generated\n"
+    "money-ore-nether: generated\n"
     "diamond-sell: 55.00\n"
     "diamond-buy: 123.00\n"
 )

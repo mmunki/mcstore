@@ -4,8 +4,10 @@ import dev.mmunki.mcstore.McStore;
 import dev.mmunki.mcstore.catalog.ItemClassifier;
 import dev.mmunki.mcstore.catalog.RarityTier;
 import dev.mmunki.mcstore.config.PriceEntry;
+import dev.mmunki.mcstore.economy.ExchangeService;
 import dev.mmunki.mcstore.economy.Money;
 import dev.mmunki.mcstore.economy.StoreService;
+import dev.mmunki.mcstore.market.MarketQuote;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +36,7 @@ public final class StoreMenu extends ChestMenu {
     public enum Mode {
         BUY("Buy"),
         SELL("Sell"),
+        EXCHANGE("XP Exchange"),
         EDIT("Price Editor");
 
         private final String title;
@@ -58,6 +61,7 @@ public final class StoreMenu extends ChestMenu {
 
     private final McStore store;
     private final StoreService service;
+    private final ExchangeService exchangeService;
     private final ServerPlayer player;
     private final Mode mode;
     private final SimpleContainer container;
@@ -73,6 +77,7 @@ public final class StoreMenu extends ChestMenu {
         super(MenuType.GENERIC_9x6, syncId, playerInventory, new SimpleContainer(54), 6);
         this.store = store;
         this.service = new StoreService(store);
+        this.exchangeService = new ExchangeService(store);
         this.player = player;
         this.mode = mode;
         this.container = (SimpleContainer) getContainer();
@@ -125,6 +130,11 @@ public final class StoreMenu extends ChestMenu {
         actions.clear();
         for (int slot = 0; slot < 54; slot++) {
             container.setItem(slot, GuiUtil.filler());
+        }
+
+        if (mode == Mode.EXCHANGE) {
+            buildExchange();
+            return;
         }
 
         List<PriceEntry> entries = entriesForMode();
@@ -188,13 +198,71 @@ public final class StoreMenu extends ChestMenu {
         container.setItem(SLOT_MODE, GuiUtil.icon(Items.PAPER,
                 "Page " + (page + 1) + " / " + (maxPage + 1),
                 ChatFormatting.WHITE,
-                List.of(count + " " + (mode == Mode.BUY ? "buyable ores" : "sellable items"),
+                List.of(count + " " + (mode == Mode.BUY ? "tradable entries" : "sellable items"),
                         "Use the arrows to page.")));
-        container.setItem(SLOT_STATUS, GuiUtil.icon(Items.CHEST,
-                mode == Mode.BUY ? "Buy one, or shift-click for a stack" : "Sell one, or shift-click for everything",
+        container.setItem(SLOT_ACTION, GuiUtil.icon(Items.EXPERIENCE_BOTTLE,
+                "Exchange XP for money", ChatFormatting.AQUA,
+                List.of("1 level = " + Money.format(store.config().xpCentsPerLevel()),
+                        "Click to open the exchange.")));
+        actions.put(SLOT_ACTION, (clicker, button, shift) -> open(clicker, store, Mode.EXCHANGE));
+        container.setItem(SLOT_STATUS, GuiUtil.icon(Items.CLOCK,
+                "Next restock: " + McStore.formatDuration(store.secondsUntilRestock()),
                 ChatFormatting.YELLOW,
-                List.of("Every click is safe: the server verifies funds",
-                        "and inventory before anything changes.")));
+                List.of("Stock is consumed by buying and replenished by selling.",
+                        "A full restock refills every market item.")));
+    }
+
+    private void buildExchange() {
+        long balance = store.balances().balance(player.getUUID());
+        long perLevel = store.config().xpCentsPerLevel();
+        int levels = player.experienceLevel;
+
+        container.setItem(4, GuiUtil.icon(Items.GOLD_INGOT, "Balance: " + Money.format(balance),
+                ChatFormatting.GOLD,
+                List.of("Exchange experience levels for money.")));
+        container.setItem(13, GuiUtil.icon(Items.EXPERIENCE_BOTTLE,
+                "Your experience: " + levels + " levels", ChatFormatting.GREEN,
+                List.of("1 level = " + Money.format(perLevel),
+                        "The exchange is instant and irreversible.")));
+
+        int[] amounts = {1, 5, 10, 25};
+        int[] slots = {20, 21, 22, 23};
+        for (int i = 0; i < amounts.length; i++) {
+            exchangeOffer(slots[i], amounts[i], levels, perLevel);
+        }
+        exchangeOffer(24, Math.max(0, levels), levels, perLevel);
+
+        container.setItem(SLOT_INFO, GuiUtil.icon(Items.CLOCK,
+                "Market restock: " + McStore.formatDuration(store.secondsUntilRestock()),
+                ChatFormatting.YELLOW,
+                List.of("Buy when stock is high, sell when stock is low.")));
+        container.setItem(SLOT_CLOSE, GuiUtil.icon(Items.BARRIER, "Close", ChatFormatting.RED,
+                List.of("Return to the game.")));
+        actions.put(SLOT_CLOSE, (clicker, button, shift) -> clicker.closeContainer());
+    }
+
+    private void exchangeOffer(int slot, int amount, int levels, long perLevel) {
+        if (amount <= 0 || levels < amount) {
+            container.setItem(slot, GuiUtil.icon(Items.GLASS_BOTTLE,
+                    amount == 0 ? "All levels" : amount + " levels",
+                    ChatFormatting.DARK_GRAY,
+                    List.of("Not enough experience.",
+                            "You have " + levels + " levels.")));
+            return;
+        }
+        long cents = amount * perLevel;
+        String label = amount == levels ? "All " + amount + " levels" : amount + " level" + (amount == 1 ? "" : "s");
+        container.setItem(slot, GuiUtil.icon(Items.EXPERIENCE_BOTTLE, label,
+                ChatFormatting.GREEN,
+                List.of("Receive: " + Money.format(cents),
+                        "Current level: " + levels,
+                        "Click to exchange.")));
+        actions.put(slot, (clicker, button, shift) -> {
+            if (exchangeService.exchange(clicker, amount)) {
+                rebuild();
+                broadcastChanges();
+            }
+        });
     }
 
     private void buildEditFooter() {
@@ -256,8 +324,9 @@ public final class StoreMenu extends ChestMenu {
                 service.sell(clicker, entry.itemId(), shift ? -1 : 1);
                 refresh();
             }
-            case EDIT -> {
-                adjust(entry, button, shift);
+            case EDIT -> adjust(entry, button, shift);
+            case EXCHANGE -> {
+                // handled by the exchange offers, not by item entries
             }
         }
     }
@@ -297,26 +366,44 @@ public final class StoreMenu extends ChestMenu {
         Component name = stack.getHoverName().copy().withStyle(color);
         List<Component> lore = new ArrayList<>();
         lore.add(Component.literal("Rarity: " + entry.rarity().displayName()).withStyle(color));
-        if (entry.buyCents() != null) {
-            lore.add(Component.literal("Buy: " + Money.format(entry.buyCents())).withStyle(ChatFormatting.GREEN));
-        } else {
-            lore.add(Component.literal("Buy: not for sale").withStyle(ChatFormatting.DARK_GRAY));
-        }
-        lore.add(Component.literal("Sell: " + Money.format(entry.sellCents())).withStyle(ChatFormatting.GOLD));
-        switch (mode) {
-            case BUY -> lore.add(Component.literal("Click: buy 1 · Shift-click: buy a stack")
-                    .withStyle(ChatFormatting.GRAY));
-            case SELL -> lore.add(Component.literal("Click: sell 1 · Shift-click: sell all")
-                    .withStyle(ChatFormatting.GRAY));
-            case EDIT -> {
-                lore.add(Component.literal("Editing " + (editingBuy ? "BUY" : "SELL")
-                        + " · LMB +1 · RMB -1 · Shift +10/-10").withStyle(ChatFormatting.AQUA));
-                if (draftDirty) {
-                    lore.add(Component.literal("Unsaved draft").withStyle(ChatFormatting.YELLOW));
-                }
+
+        MarketQuote quote = store.quote(entry);
+        if (mode == Mode.EDIT) {
+            if (entry.buyCents() != null) {
+                lore.add(Component.literal("Base buy: " + Money.format(entry.buyCents())).withStyle(ChatFormatting.GREEN));
+            } else {
+                lore.add(Component.literal("Buy: not for sale").withStyle(ChatFormatting.DARK_GRAY));
             }
+            lore.add(Component.literal("Base sell: " + Money.format(entry.sellCents())).withStyle(ChatFormatting.GOLD));
+            lore.add(Component.literal("Editing " + (editingBuy ? "BUY" : "SELL")
+                    + " · LMB +1 · RMB -1 · Shift +10/-10").withStyle(ChatFormatting.AQUA));
+            if (draftDirty) {
+                lore.add(Component.literal("Unsaved draft").withStyle(ChatFormatting.YELLOW));
+            }
+        } else {
+            if (mode == Mode.BUY && quote.buyable()) {
+                lore.add(Component.literal("Market buy: " + Money.format(quote.buyCents())).withStyle(ChatFormatting.GREEN));
+            }
+            lore.add(Component.literal("Market sell: " + Money.format(quote.sellCents())).withStyle(ChatFormatting.GOLD));
+            lore.add(Component.literal("Stock: " + stockBar(quote) + " " + quote.stock() + "/" + quote.capacity())
+                    .withStyle(ChatFormatting.AQUA));
+            lore.add(Component.literal("Trend: " + quote.trendLabel() + " · restock in "
+                    + McStore.formatDuration(store.secondsUntilRestock())).withStyle(ChatFormatting.DARK_AQUA));
+            lore.add(Component.literal(mode == Mode.BUY
+                    ? "Click: buy 1 · Shift-click: buy a stack"
+                    : "Click: sell 1 · Shift-click: sell everything").withStyle(ChatFormatting.GRAY));
         }
         return GuiUtil.icon(item, name, lore);
+    }
+
+    private static String stockBar(MarketQuote quote) {
+        int slots = 10;
+        int filled = Math.round(slots * quote.fillPercent() / 100.0f);
+        StringBuilder bar = new StringBuilder("[");
+        for (int i = 0; i < slots; i++) {
+            bar.append(i < filled ? '#' : '-');
+        }
+        return bar.append(']').toString();
     }
 
     private ItemStack pageInfo(int count, int maxPage) {
@@ -340,6 +427,7 @@ public final class StoreMenu extends ChestMenu {
         return switch (mode) {
             case BUY -> store.buyableEntries();
             case SELL -> store.sellableEntries();
+            case EXCHANGE -> List.of();
             case EDIT -> new ArrayList<>(draft.values());
         };
     }

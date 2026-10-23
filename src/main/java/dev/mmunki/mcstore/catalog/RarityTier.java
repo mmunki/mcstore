@@ -7,24 +7,27 @@ import java.util.Locale;
  * cents; buy prices are derived from the same tier with a 2x-4x multiplier.
  */
 public enum RarityTier {
-    COMMON("Common", "GRAY", 100L, 500L, 200),
-    UNCOMMON("Uncommon", "GREEN", 500L, 1_500L, 250),
-    RARE("Rare", "BLUE", 1_500L, 4_000L, 300),
-    EPIC("Epic", "LIGHT_PURPLE", 4_000L, 10_000L, 350),
-    LEGENDARY("Legendary", "GOLD", 10_000L, 25_000L, 400);
+    COMMON("Common", "GRAY", 100L, 500L, 200, 512),
+    UNCOMMON("Uncommon", "GREEN", 500L, 1_500L, 250, 256),
+    RARE("Rare", "BLUE", 1_500L, 4_000L, 300, 64),
+    EPIC("Epic", "LIGHT_PURPLE", 4_000L, 10_000L, 350, 16),
+    LEGENDARY("Legendary", "GOLD", 10_000L, 25_000L, 400, 4);
 
     private final String displayName;
     private final String colorName;
     private final long sellMinCents;
     private final long sellMaxCents;
     private final int buyPercent;
+    private final int stockCapacity;
 
-    RarityTier(String displayName, String colorName, long sellMinCents, long sellMaxCents, int buyPercent) {
+    RarityTier(String displayName, String colorName, long sellMinCents, long sellMaxCents,
+               int buyPercent, int stockCapacity) {
         this.displayName = displayName;
         this.colorName = colorName;
         this.sellMinCents = sellMinCents;
         this.sellMaxCents = sellMaxCents;
         this.buyPercent = buyPercent;
+        this.stockCapacity = stockCapacity;
     }
 
     public String displayName() {
@@ -45,6 +48,15 @@ public enum RarityTier {
 
     public int buyPercent() {
         return buyPercent;
+    }
+
+    /**
+     * Stock cap for an item of this rarity.  Rarer goods are scarce: a
+     * legendary item has a cap of four, while common building materials have
+     * hundreds.  The cap is the stock level after a restock.
+     */
+    public int defaultStockCapacity() {
+        return stockCapacity;
     }
 
     public String sellBand() {

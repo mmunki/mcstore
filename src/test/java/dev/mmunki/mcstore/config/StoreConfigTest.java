@@ -22,6 +22,8 @@ class StoreConfigTest {
         StoreConfig config = StoreConfig.loadOrCreate(file);
         assertEquals(Money.STARTING_BALANCE_CENTS, config.startingBalanceCents());
         assertTrue(config.refreshOpenGuis());
+        assertEquals(600, config.restockSeconds());
+        assertEquals(100L, config.xpCentsPerLevel());
         assertTrue(Files.exists(file));
     }
 
@@ -31,12 +33,16 @@ class StoreConfigTest {
         Files.writeString(file, """
                 {
                   "startingBalance": 250.75,
-                  "refreshOpenGuis": false
+                  "refreshOpenGuis": false,
+                  "restockSeconds": 120,
+                  "xpCentsPerLevel": 2.50
                 }
                 """);
         StoreConfig config = StoreConfig.loadOrCreate(file);
         assertEquals(25_075L, config.startingBalanceCents());
         assertFalse(config.refreshOpenGuis());
+        assertEquals(120, config.restockSeconds());
+        assertEquals(250L, config.xpCentsPerLevel());
     }
 
     @Test

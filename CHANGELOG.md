@@ -1,5 +1,52 @@
 # Changelog
 
+## 26.2.2 — 2026-10-23
+
+### Added
+
+- Rarity stock caps: COMMON 512, UNCOMMON 256, RARE 64, EPIC 16, LEGENDARY 4.
+- A live market quote for every item. Prices move between -25% and +25% of the
+  base price as stock empties and refills.
+- Automatic full restock every 600 seconds, configurable with `restockSeconds`
+  (`0` disables it), persisted together with stock in `config/mcstore/stocks.json`.
+- Selling adds the sold items to the store stock; a full item stops buying until
+  stock is consumed or the market restocks. Buying consumes stock.
+- `/stock <item>` and `/mcstore stock <item>` with stock, fill bar, market
+  buy/sell prices, trend and restock countdown.
+- `/mcstore restock` for an immediate full market restock.
+- `/exchange`, `/exchange <levels>` and `/exchange all`, plus an XP Exchange
+  chest GUI with 1, 5, 10, 25 and all-level offers. The default rate is 1.00
+  per level and is configurable with `xpCentsPerLevel`.
+- The Money Ore: a RARE block/item with diamond-tier value (base sell 50.00,
+  buy 150.00) that generates in overworld stone/deepslate and in netherrack,
+  drops itself, works with Silk Touch, requires an iron pickaxe and awards
+  experience when mined.
+- Block/item registration, blockstate/model/texture/language resources, loot
+  table, pickaxe/iron-tier tags and data-driven overworld + nether worldgen.
+- The shop GUI now shows live market prices, a stock bar, the market trend and
+  the restock timer, and links directly to the XP exchange.
+
+### Changed
+
+- `prices.json` entries are now base prices; the server computes the live price
+  from stock. Admin edits still work exactly as before.
+- `/mcstore reload` now also reloads the stock clock.
+- The status line reports the current restock countdown.
+- The jar version is 26.2.2.
+
+### Verified
+
+- Unit tests: 46 passing.
+- Fabric 26.2 dedicated-server smoke test on Linux x86_64, Java 25:
+  - Fabric Loader 0.20.1, Fabric API 0.161.0+26.2
+  - mod initialized and all six command roots registered
+  - 1,422 price entries (1,421 vanilla + Money Ore), 100% filtered coverage
+  - stock report, forced restock and `stocks.json` verified
+  - Money Ore block placed with `/setblock`
+  - Money Ore found in generated overworld and nether region files
+  - `/mcstore setprice` and `/mcstore reload` verified
+- Release JAR is published as an asset of the `mcstore-26.2.2` release.
+
 ## 26.2.1 — 2026-10-23
 
 ### Fixed

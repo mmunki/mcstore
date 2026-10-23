@@ -27,6 +27,8 @@ class ItemClassifierTest {
         assertTrue(ItemClassifier.isBuyable("minecraft:netherite_scrap"));
         assertTrue(ItemClassifier.isBuyable("minecraft:copper_ingot"));
         assertTrue(ItemClassifier.isBuyable("minecraft:ancient_debris"));
+        assertTrue(ItemClassifier.isBuyable("mcstore:money_ore"));
+        assertEquals(RarityTier.RARE, ItemClassifier.rarity("mcstore:money_ore"));
         assertFalse(ItemClassifier.isBuyable("minecraft:dirt"));
         assertFalse(ItemClassifier.isBuyable("minecraft:oak_log"));
         assertFalse(ItemClassifier.isBuyable("minecraft:diamond_sword"));

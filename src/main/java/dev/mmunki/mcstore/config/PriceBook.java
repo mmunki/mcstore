@@ -121,6 +121,14 @@ public final class PriceBook {
         return book;
     }
 
+    /**
+     * Adds an entry only when the id is missing.  Existing files, including
+     * admin-edited ones, are never overwritten by a built-in entry.
+     */
+    public void ensure(PriceEntry entry) {
+        entries.putIfAbsent(entry.itemId(), entry);
+    }
+
     public PriceEntry get(String itemId) {
         return entries.get(normalizeId(itemId));
     }

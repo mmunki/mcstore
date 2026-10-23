@@ -1,5 +1,6 @@
 package dev.mmunki.mcstore.config;
 
+import dev.mmunki.mcstore.catalog.PriceGenerator;
 import dev.mmunki.mcstore.catalog.RarityTier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -67,6 +68,18 @@ class PriceBookTest {
         assertNotNull(stick);
         assertEquals(250L, stick.sellCents());
         assertFalse(stick.buyable());
+    }
+
+    @Test
+    void ensureAddsMissingEntriesWithoutOverwritingEditedOnes() {
+        PriceBook book = PriceBook.generate(List.of("minecraft:diamond"));
+        PriceEntry moneyOre = PriceGenerator.defaultEntry("mcstore:money_ore");
+        book.ensure(moneyOre);
+        assertEquals(5_000L, book.get("mcstore:money_ore").sellCents());
+
+        PriceEntry edited = moneyOre.withSellCents(777L);
+        book.ensure(edited);
+        assertEquals(5_000L, book.get("mcstore:money_ore").sellCents());
     }
 
     @Test

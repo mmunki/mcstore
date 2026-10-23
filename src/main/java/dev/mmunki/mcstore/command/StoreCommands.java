@@ -2,6 +2,7 @@ package dev.mmunki.mcstore.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
@@ -10,9 +11,11 @@ import dev.mmunki.mcstore.McStore;
 import dev.mmunki.mcstore.catalog.ItemClassifier;
 import dev.mmunki.mcstore.config.PriceBook;
 import dev.mmunki.mcstore.config.PriceEntry;
+import dev.mmunki.mcstore.economy.ExchangeService;
 import dev.mmunki.mcstore.economy.Money;
 import dev.mmunki.mcstore.economy.StoreService;
 import dev.mmunki.mcstore.gui.StoreMenu;
+import dev.mmunki.mcstore.market.MarketQuote;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.IdentifierArgument;
@@ -31,6 +34,7 @@ public final class StoreCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, McStore store) {
         StoreService service = new StoreService(store);
+        ExchangeService exchangeService = new ExchangeService(store);
 
         dispatcher.register(Commands.literal("buy")
                 .executes(context -> openStore(context.getSource(), store, StoreMenu.Mode.BUY))
@@ -43,6 +47,19 @@ public final class StoreCommands {
                 .then(Commands.literal("hand").executes(context -> sellHand(context.getSource(), service)))
                 .then(Commands.literal("all").executes(context -> sellAll(context.getSource(), service))));
 
+        dispatcher.register(Commands.literal("exchange")
+                .executes(context -> openStore(context.getSource(), store, StoreMenu.Mode.EXCHANGE))
+                .then(Commands.literal("all")
+                        .executes(context -> exchangeLevels(context.getSource(), exchangeService, -1)))
+                .then(Commands.argument("levels", IntegerArgumentType.integer(1, 1000))
+                        .executes(context -> exchangeLevels(context.getSource(), exchangeService,
+                                IntegerArgumentType.getInteger(context, "levels")))));
+
+        dispatcher.register(Commands.literal("stock")
+                .then(Commands.argument("material", IdentifierArgument.id())
+                        .suggests((context, builder) -> suggestIds(builder, allIds(store)))
+                        .executes(context -> stock(context, store))));
+
         dispatcher.register(Commands.literal("balance")
                 .executes(context -> balance(context.getSource(), store)));
 
@@ -53,6 +70,12 @@ public final class StoreCommands {
                         .executes(context -> status(context.getSource(), store)))
                 .then(Commands.literal("reload")
                         .executes(context -> reload(context.getSource(), store)))
+                .then(Commands.literal("restock")
+                        .executes(context -> restock(context.getSource(), store)))
+                .then(Commands.literal("stock")
+                        .then(Commands.argument("material", IdentifierArgument.id())
+                                .suggests((context, builder) -> suggestIds(builder, allIds(store)))
+                                .executes(context -> stock(context, store))))
                 .then(Commands.literal("edit")
                         .executes(context -> edit(context.getSource(), store)))
                 .then(Commands.literal("setprice")
@@ -122,6 +145,39 @@ public final class StoreCommands {
         return service.sellAll(player) ? 1 : 0;
     }
 
+    private static int exchangeLevels(CommandSourceStack source, ExchangeService service, int levels) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.literal("Only a player can exchange experience."));
+            return 0;
+        }
+        int amount = levels < 0 ? player.experienceLevel : levels;
+        return service.exchange(player, amount) ? 1 : 0;
+    }
+
+    private static int stock(CommandContext<CommandSourceStack> context, McStore store) {
+        String id = PriceBook.normalizeId(IdentifierArgument.getId(context, "material").toString());
+        CommandSourceStack source = context.getSource();
+        if (!store.isRegistered(id)) {
+            source.sendFailure(Component.literal("Unknown item: " + id));
+            return 0;
+        }
+        PriceEntry entry = store.prices().get(id);
+        if (entry == null) {
+            source.sendFailure(Component.literal("There is no price entry for " + id + "."));
+            return 0;
+        }
+        MarketQuote quote = store.quote(entry);
+        source.sendSuccess(() -> Component.literal("Stock " + id + ": " + quote.stock() + "/" + quote.capacity()
+                + " (" + quote.fillPercent() + "%) · market buy "
+                + (quote.buyable() ? Money.format(quote.buyCents()) : "not for sale")
+                + " · market sell " + Money.format(quote.sellCents())
+                + " · " + quote.trendLabel()
+                + " · restock in " + McStore.formatDuration(store.secondsUntilRestock()))
+                .withStyle(ChatFormatting.AQUA), false);
+        return 1;
+    }
+
     private static int balance(CommandSourceStack source, McStore store) {
         ServerPlayer player = source.getPlayer();
         if (player == null) {
@@ -140,15 +196,22 @@ public final class StoreCommands {
         source.sendSuccess(() -> Component.literal(status)
                 .withStyle(ChatFormatting.GOLD), false);
         source.sendSuccess(() -> Component.literal("Coverage target 80%: " + (pass ? "PASS" : "FAIL")
-                + " · /buy /sell /balance · /mcstore setprice|reload|edit")
+                + " · /buy /sell /exchange /stock /balance · /mcstore setprice|reload|restock|edit")
                 .withStyle(pass ? ChatFormatting.GREEN : ChatFormatting.RED), false);
+        return 1;
+    }
+
+    private static int restock(CommandSourceStack source, McStore store) {
+        store.forceRestock();
+        source.sendSuccess(() -> Component.literal("MCStore market restocked: every item is back at full stock.")
+                .withStyle(ChatFormatting.GREEN), false);
         return 1;
     }
 
     private static int reload(CommandSourceStack source, McStore store) {
         store.refreshRegistryIds();
         store.reload();
-        source.sendSuccess(() -> Component.literal("MCStore reloaded prices.json and config.json.")
+        source.sendSuccess(() -> Component.literal("MCStore reloaded prices.json, stocks.json and config.json.")
                 .withStyle(ChatFormatting.GREEN), false);
         source.sendSuccess(() -> Component.literal(store.status()).withStyle(ChatFormatting.GOLD), false);
         return 1;

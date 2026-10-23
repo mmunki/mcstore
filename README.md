@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/banner.png" alt="MCStore — economy and chest-GUI shop for Fabric, singleplayer and servers" width="100%">
+  <img src="docs/banner.png" alt="MCStore — stock-market economy and chest-GUI shop for Fabric, singleplayer and servers" width="100%">
 </p>
 
 <h1 align="center">MCStore</h1>
 
 <p align="center">
-  An economy and chest-GUI shop for Fabric that works in singleplayer worlds and on dedicated servers.<br>
-  Buy ores and minerals, sell almost everything, and edit prices live. Vanilla clients can still join a server without the mod.
+  A stock-market economy and chest-GUI shop for Fabric that works in singleplayer worlds and on dedicated servers.<br>
+  Buy and sell ores and minerals, watch stock and prices move, convert XP to money, and mine the Money Ore in the overworld and the nether.
 </p>
 
 <p align="center">
@@ -18,25 +18,30 @@
 
 ---
 
-## A shop that feels native
+## A market, not a vending machine
 
-MCStore adds a small, focused economy to a Fabric world. Players open a normal chest interface, buy the ores and minerals they need, and sell the extra items they already have. Admins get a live price editor and a JSON price book that can be versioned, backed up, or generated once and edited by hand.
+MCStore is a small, focused economy for a Fabric world. Every tradable item has a **rarity-based stock cap**, the shop **restocks on a timer**, and prices move with supply just like a real market. Selling an item puts it back on the shelf; buying it takes it off the shelf. Players can also **exchange experience levels for money** and hold goods as an investment.
 
-The same jar runs in **singleplayer worlds** (the integrated server) and on **dedicated servers**. There is no custom item, no custom block and no custom menu type: the shop uses Minecraft's own chest menu, so a vanilla client can join a server that has the mod and needs no downloads.
+The shop is a normal chest interface, so it feels native and needs no custom menu screen. The only registry content is the **Money Ore**, a diamond-rarity ore that generates in both the overworld and the nether.
 
 ## Features
 
 | | |
 | --- | --- |
 | **Chest-GUI shop** | `/buy` and `/sell` open a paged 9x6 chest. Every click is verified by the server. |
+| **Rarity stock caps** | Common items have 512 units, uncommon 256, rare 64, epic 16, legendary 4. |
+| **Restocking market** | Every 600 seconds the market refills to full stock. The GUI and `/stock` show the countdown. |
+| **Real supply and demand** | Buying removes stock and raises the live price; selling adds stock and lowers it. Prices move between -25% and +25% from the base price. |
+| **Sell-to-restock** | A sold ore is immediately available for another player to buy. A completely full item stops buying. |
+| **Money Ore** | A rare ore, similar to diamond, that generates in overworld stone/deepslate and in netherrack. |
+| **XP exchange** | `/exchange` opens a chest GUI that converts experience levels to money at a configurable rate. |
 | **Buy ores and minerals** | Ores, raw materials, ingots, nuggets, scraps and useful mineral blocks are buyable. |
 | **Sell almost everything** | Every non-blacklisted vanilla item gets a generated sell price, including blocks, tools, food and drops. |
-| **Persistent economy** | Balances are stored as integer cents in `balances.json`, so there is no floating-point drift. |
+| **Persistent economy** | Balances are stored as integer cents in `balances.json`; stock and the restock clock live in `stocks.json`. |
 | **Live admin editor** | `/mcstore edit` opens a draft editor with buy/sell switching, +/- buttons and Save & Reload. |
 | **Immediate command edits** | `/mcstore setprice <item> <buy\|sell> <price>` writes the file and refreshes open shop views. |
 | **Deterministic defaults** | The same item id always gets the same generated price, and prices stay inside their rarity band. |
-| **Client + server** | One universal jar works in singleplayer and on servers. No registry content; remove the jar and the game is clean again. |
-| **Small release** | The release JAR is well below 1 MB. |
+| **Client + server** | One universal jar works in singleplayer and on servers. |
 
 ## Preview
 
@@ -48,7 +53,7 @@ The same jar runs in **singleplayer worlds** (the integrated server) and on **de
 <p align="center">
   <img src="docs/screenshots/admin.png" alt="Price editor screen mockup" width="64%">
   <br>
-  <sub>Illustrative interface previews. The real screens use Minecraft's vanilla chest interface.</sub>
+  <sub>Illustrative interface previews. The real screens use Minecraft's vanilla chest interface with live stock bars and market prices.</sub>
 </p>
 
 ## Requirements
@@ -68,8 +73,8 @@ MCStore is built for the 26.2 line. The mod metadata declares `minecraft: "~26.2
 
 1. Install **Fabric Loader** for Minecraft **26.2** using the official installer.
 2. Put **Fabric API** and **MCStore** into `.minecraft/mods/` (or your launcher profile's `mods/` directory).
-3. Start the game and open or create a world. MCStore creates `config/mcstore/` and registers `/buy`, `/sell`, `/balance` and `/mcstore`.
-4. Run `/buy` or `/sell` to open the shop. In a survival world without cheats, `/buy`, `/sell` and `/balance` still work; `/mcstore` needs cheats/op or a UUID in `admins.json`.
+3. Start the game and open or create a world. MCStore creates `config/mcstore/` and registers `/buy`, `/sell`, `/exchange`, `/stock`, `/balance` and `/mcstore`.
+4. Run `/buy` or `/sell` to open the shop, or `/exchange` to convert XP. In a survival world without cheats, those player commands still work; `/mcstore` needs cheats/op or a UUID in `admins.json`.
 
 ### Dedicated server
 
@@ -78,11 +83,11 @@ MCStore is built for the 26.2 line. The mod metadata declares `minecraft: "~26.2
    java -jar fabric-installer.jar server -mcversion 26.2 -loader 0.20.1 -downloadMinecraft
    ```
 2. Put **Fabric API** and **MCStore** into the server's `mods/` directory.
-3. Start the server. MCStore creates `config/mcstore/` and logs the command registration and price coverage.
+3. Start the server. MCStore creates `config/mcstore/`, logs the command registration and generates the price book and stock clock.
 4. Join as an operator (or add your UUID to `admins.json`) and run `/mcstore` to see the status.
-5. Run `/buy` or `/sell` to open the shop.
+5. Run `/buy`, `/sell`, `/exchange` or `/stock` to use the economy.
 
-No client-side installation is needed to join a server, but installing the same jar on the client enables the shop in singleplayer. The jar is one universal build, not separate client and server downloads.
+Install the same jar on the client for singleplayer worlds and to see the Money Ore texture and model. The jar is one universal build, not separate client and server downloads.
 
 ## Commands
 
@@ -92,13 +97,19 @@ No client-side installation is needed to join a server, but installing the same 
 | `/buy <item>` | Player | Buy one of a buyable item directly, for example `/buy minecraft:diamond`. |
 | `/sell` | Player | Open the sell GUI. |
 | `/sell hand` | Player | Sell the stack you are holding. |
-| `/sell all` | Player | Sell every sellable item in your inventory. |
+| `/sell all` | Player | Sell every sellable item in your inventory (subject to stock space). |
+| `/exchange` | Player | Open the XP-to-money exchange GUI. |
+| `/exchange <levels>` | Player | Convert that many experience levels to money. |
+| `/exchange all` | Player | Convert every experience level you have. |
+| `/stock <item>` | Player | Show stock, live buy/sell prices, trend and the restock countdown. |
 | `/balance` | Player | Show your balance. |
-| `/mcstore` | Admin | Show coverage and status. |
+| `/mcstore` | Admin | Show coverage, market status and restock time. |
 | `/mcstore status` | Admin | Same as `/mcstore`. |
-| `/mcstore setprice <item> <buy\|sell> <price>` | Admin | Set one price, write `prices.json` and refresh open views. |
+| `/mcstore stock <item>` | Admin | Same stock report as `/stock`. |
+| `/mcstore restock` | Admin | Force an immediate full restock. |
+| `/mcstore setprice <item> <buy\|sell> <price>` | Admin | Set one base price, write `prices.json` and refresh open views. |
 | `/mcstore edit` | Admin, player | Open the live price editor. |
-| `/mcstore reload` | Admin | Re-read `config.json`, `prices.json` and `admins.json`. |
+| `/mcstore reload` | Admin | Re-read `config.json`, `prices.json`, `stocks.json` and `admins.json`. |
 
 Item arguments accept both `minecraft:diamond` and the short form `diamond`. Prices are decimal currency amounts with two decimals of precision, for example `55.00`.
 
@@ -106,51 +117,93 @@ Item arguments accept both `minecraft:diamond` and the short form `diamond`. Pri
 
 - `/mcstore` and all of its subcommands require permission level **2** (GAMEMASTER), or a UUID listed in `config/mcstore/admins.json`.
 - The server console always has access.
-- `/buy`, `/sell` and `/balance` are for players; the console receives a clear error instead.
+- `/buy`, `/sell`, `/exchange`, `/stock` and `/balance` are for players; the console receives a clear error for player-only actions.
 - `/mcstore edit` needs a player because it opens a chest GUI.
 
 ## Using the shop
+
+### The stock market
+
+Every tradable item has a stock level and a cap that depends on rarity:
+
+| Rarity | Stock cap | Restock |
+| --- | --- | --- |
+| Common | 512 | Full |
+| Uncommon | 256 | Full |
+| Rare | 64 | Full |
+| Epic | 16 | Full |
+| Legendary | 4 | Full |
+
+The default cycle is **600 seconds** (`restockSeconds` in `config.json`). A restock sets every item back to its cap. `restockSeconds: 0` disables automatic restocks.
+
+Prices are quoted from the base price in `prices.json` and a supply factor:
+
+- **Full stock**: base price × 0.75 (oversupplied).
+- **Empty stock**: base price × 1.25 (scarce).
+- The market is never off by more than ±25%, so prices stay readable and the base price remains an admin control.
+
+Buying consumes stock, which pushes the next quote up. Selling adds stock, which pushes the next quote down. If an item is at its cap, the store stops buying it until stock is consumed or the next restock happens. If an item has no stock left, buying is refused until it is sold back or restocked.
+
+This makes holding goods a real investment: buy while the shelves are full and cheap, then sell when the market is scarce and pays more.
 
 ### Buying
 
 - Click an item to buy **one**.
 - Shift-click to buy a full stack of that item.
-- The purchase is checked in this order: price exists, item exists, balance is sufficient, inventory has room. Money is only withdrawn after those checks pass, and a failed inventory insert is refunded.
+- The purchase is checked in this order: price exists, stock is available, balance is sufficient, inventory has room. Money is only withdrawn after those checks pass, and a failed inventory insert is refunded and the stock is returned.
+- The lore shows the live market buy price, a stock bar, the trend and the restock timer.
 - The GUI displays the current balance on the gold ingot in the footer.
 
 ### Selling
 
 - Click an item to sell **one**.
-- Shift-click to sell **all of that item** currently in your inventory.
-- `/sell hand` sells the held stack. `/sell all` walks the inventory and sells every item that has a price.
+- Shift-click to sell **all of that item** currently in your inventory, limited by remaining stock space.
+- `/sell hand` sells the held stack. `/sell all` walks the inventory and sells every item that has a price and stock space.
 - Sale proceeds are credited immediately and the new balance is written to disk.
+
+### Exchange
+
+- `/exchange` opens a chest with offers for 1, 5, 10, 25 and all experience levels.
+- `/exchange <levels>` and `/exchange all` convert directly from chat.
+- The default rate is **1.00 per level** (`xpCentsPerLevel` in `config.json`).
+- Levels are removed before the money is credited; the exchange cannot create money without spending XP.
+
+### Money Ore
+
+- The Money Ore is a **Rare** commodity, the same tier as diamond.
+- Base market values: **sell 50.00**, **buy 150.00** (before the live supply factor).
+- It generates in the overworld between bedrock and y=80, replacing stone and deepslate, and in the nether between y=10 and the top of the nether ceiling area, replacing netherrack.
+- It drops itself, works with Silk Touch, needs an iron pickaxe (or better) and awards 2–5 experience when mined.
+- Every generated ore can be sold to the store, and every sale adds to the stock another player can buy.
+- Admin-editable like any other entry: `/mcstore setprice mcstore:money_ore sell 60.00`.
 
 ### Paging and navigation
 
-The shop shows 45 entries per page. The bottom row holds the page arrows, balance, page number, close button and a short help icon. Display items cannot be removed: all clicks are intercepted by the server menu, and shift-click item movement is disabled.
+The shop shows 45 entries per page. The bottom row holds the page arrows, balance, page number, restock clock, XP-exchange shortcut and close button. Display items cannot be removed: all clicks are intercepted by the server menu, and shift-click item movement is disabled.
 
 ## Prices and rarity
 
 MCStore uses five rarity bands. Default sell prices are deterministic and stay inside the band. Generated buy prices are between **2x and 4x** the sell price; the multiplier rises with rarity.
 
-| Rarity | Sell band | Default buy multiplier |
-| --- | --- | --- |
-| Common | 1.00 – 5.00 | 2.0x |
-| Uncommon | 5.00 – 15.00 | 2.5x |
-| Rare | 15.00 – 40.00 | 3.0x |
-| Epic | 40.00 – 100.00 | 3.5x |
-| Legendary | 100.00 – 250.00 | 4.0x |
+| Rarity | Sell band | Default buy multiplier | Stock cap |
+| --- | --- | --- | --- |
+| Common | 1.00 – 5.00 | 2.0x | 512 |
+| Uncommon | 5.00 – 15.00 | 2.5x | 256 |
+| Rare | 15.00 – 40.00 | 3.0x | 64 |
+| Epic | 40.00 – 100.00 | 3.5x | 16 |
+| Legendary | 100.00 – 250.00 | 4.0x | 4 |
 
 On a clean Minecraft 26.2 server the generator produced:
 
-- **1,421 prices**
+- **1,421 vanilla prices**
 - **1,421 of 1,421 filtered items (100%)**
 - **1,421 of 1,537 registry items (92%)**
-- **56 buyable ores and mineral entries**
+- **57 buyable ore/mineral entries**, including the Money Ore
+- **1,422 total price entries** (the 1,421 vanilla entries plus the Money Ore)
 
 Coverage is measured against the filtered set: every `minecraft:` item that is not intentionally blacklisted. Technical and creative-only items, spawn eggs, command and structure blocks, portals, bedrock, barriers, light blocks, budding amethyst and similar entries are excluded.
 
-Generated prices are written once to `prices.json`. Existing files are loaded as-is on restart, so admin edits are not overwritten. If the file is empty or missing, defaults are generated again.
+Generated prices are written once to `prices.json`. Existing files are loaded as-is on restart, so admin edits are not overwritten. If the file is empty or missing, defaults are generated again. The Money Ore entry is added to an older price file only when it is missing.
 
 ## Configuration
 
@@ -160,14 +213,18 @@ All files live in `config/mcstore/` relative to the server directory.
 
 ```json
 {
-  "_comment": "MCStore server configuration. startingBalance is a decimal currency amount (for example 100.00); refreshOpenGuis updates open /buy and /sell views instantly.",
+  "_comment": "MCStore server configuration. startingBalance is a decimal currency amount (for example 100.00); refreshOpenGuis updates open views instantly; restockSeconds is the market cycle; xpCentsPerLevel is the value of one experience level.",
   "startingBalance": 100.00,
-  "refreshOpenGuis": true
+  "refreshOpenGuis": true,
+  "restockSeconds": 600,
+  "xpCentsPerLevel": 1.00
 }
 ```
 
 - `startingBalance` is used the first time a player's balance is requested. Changing it does **not** top up players who already have a ledger entry.
 - `refreshOpenGuis: true` redraws open shop views after a price change. Set it to `false` if you prefer to close open shops when prices change.
+- `restockSeconds` is the full-restock cycle. `0` disables automatic restocking.
+- `xpCentsPerLevel` is the exchange rate for one experience level.
 
 ### `prices.json`
 
@@ -178,6 +235,11 @@ All files live in `config/mcstore/` relative to the server directory.
       "rarity": "RARE",
       "buy": 120.00,
       "sell": 40.00
+    },
+    "mcstore:money_ore": {
+      "rarity": "RARE",
+      "buy": 150.00,
+      "sell": 50.00
     },
     "minecraft:oak_log": {
       "rarity": "COMMON",
@@ -191,8 +253,27 @@ All files live in `config/mcstore/` relative to the server directory.
 - `buy` is optional. Omit it (or set it to `null`) to make an item **sell-only**.
 - `rarity` is `COMMON`, `UNCOMMON`, `RARE`, `EPIC` or `LEGENDARY`. Case-insensitive names are accepted.
 - Prices may be JSON numbers or decimal strings; both are converted to integer cents.
+- These are **base** prices. The live price is calculated from stock at query time.
 - After hand-editing, run `/mcstore reload` (or restart) so the server picks up the file.
-- Backup this file before a large edit. It is the complete price book, not a patch.
+
+### `stocks.json`
+
+```json
+{
+  "_comment": "MCStore stock. An item that is not listed is at full stock.",
+  "restockSeconds": 600,
+  "lastRestock": 1792741200,
+  "stocks": {
+    "minecraft:diamond": 23,
+    "mcstore:money_ore": 7
+  }
+}
+```
+
+- Items that are not listed are at full stock. Only items traded below the cap are written here.
+- `lastRestock` is Unix epoch seconds and drives the countdown.
+- `stocks.json` is rewritten atomically after every trade, restock and shutdown.
+- To reset the market, replace the file with `{}` (or delete it) while the server is stopped, then start the server.
 
 ### `admins.json`
 
@@ -228,6 +309,7 @@ Values are **integer cents** (`10000` = `100.00`). MCStore writes this file on e
 - Click an item with left mouse to add **1.00**; right mouse subtracts **1.00**.
 - Hold shift to change the value by **10.00** per click.
 - **Save & Reload** writes `prices.json` immediately and refreshes open `/buy` and `/sell` views.
+- The editor shows base prices; the live price still moves with stock.
 - The hopper discards the draft and reloads the file from disk.
 - The barrier closes the editor.
 
@@ -238,6 +320,8 @@ The draft is held in memory until you save, so you can adjust several prices bef
 ```mcfunction
 mcstore setprice minecraft:diamond sell 55.00
 mcstore setprice minecraft:diamond buy 165.00
+mcstore setprice mcstore:money_ore sell 60.00
+mcstore restock
 mcstore reload
 ```
 
@@ -245,10 +329,10 @@ mcstore reload
 
 ## Persistence and backups
 
-- Prices, balances, config and admins are plain JSON. They are deliberately readable and easy to diff.
-- `balances.json` is written atomically after each change; a crash should not leave a half-written file.
+- Prices, balances, stock and config are plain JSON. They are deliberately readable and easy to diff.
+- `balances.json`, `prices.json` and `stocks.json` are written atomically; a crash should not leave a half-written file.
 - Back up `config/mcstore/` before changing prices, resetting an economy or moving a world.
-- Removing the mod removes its commands and GUI. The JSON files remain and can be reused if the mod is installed again.
+- Removing the mod removes its commands, the shop GUI and the Money Ore registry content. The JSON files remain and can be reused if the mod is installed again.
 
 ## Building from source
 
@@ -259,28 +343,27 @@ Requirements: JDK **25** and network access to the Fabric Maven repository.
 ./gradlew build
 ```
 
-The build produces `build/libs/MCStore-26.2.1.jar` (and a lowercase copy, `build/libs/mcstore-26.2.1.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
+The build produces `build/libs/MCStore-26.2.2.jar` (and a lowercase copy, `build/libs/mcstore-26.2.2.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
 
 ### Tests
 
-The repository contains unit tests for rarity bands, price generation, blacklist and buyable classification, coverage math, JSON price persistence, balance persistence, config parsing and the item-id command argument.
+The repository contains 46 unit tests for rarity bands, price generation, blacklist and buyable classification, coverage math, JSON price persistence, stock persistence, market quotes, balance persistence, config parsing and the item-id command argument.
 
 ### Smoke test
 
-`scripts/smoke-test.sh` builds the mod, downloads a Fabric 26.2 server and Fabric API into `build/smoke/` (ignored by Git), starts the server, runs commands from the console, stops it and verifies the log and generated files:
+`scripts/smoke-test.sh` builds the mod, downloads a Fabric 26.2 server and Fabric API into `build/smoke/` (ignored by Git), starts the server, runs commands from the console, stops it and verifies the log, generated files, and generated worlds:
 
 ```bash
 JAVA_HOME=/path/to/jdk-25 scripts/smoke-test.sh
 ```
 
-The script checks that the mod initializes, the commands register, the 80% coverage target passes, `/mcstore setprice` writes the new price, `/mcstore reload` works and `prices.json`, `balances.json`, `config.json` and `admins.json` are created.
+The script checks that the mod initializes, the commands register, the 80% coverage target passes, stock and `/mcstore restock` work, the Money Ore block can be placed and generates in both the overworld and the nether, `/mcstore setprice` writes the new price, `/mcstore reload` works and `config.json`, `prices.json`, `balances.json`, `stocks.json` and `admins.json` are created.
 
 ## Compatibility notes
 
 - **Minecraft 26.2** only in this release.
-- **Client + server**: one universal jar. Install it on the client for singleplayer and on the server for multiplayer; the same file works in both places.
-- **Vanilla clients**: a client without the mod can still join a server that has it; the shop uses a vanilla chest menu and vanilla item components.
-- **Other server-side mods** are generally fine. If another mod already registers `/buy`, `/sell`, `/balance` or `/mcstore`, the command trees may conflict; remove or rename one of them.
+- **Client + server**: one universal jar. Install it on both sides for singleplayer, the full Money Ore experience and the exchange GUI.
+- **Other server-side mods** are generally fine. If another mod already registers `/buy`, `/sell`, `/exchange`, `/stock`, `/balance` or `/mcstore`, the command trees may conflict; remove or rename one of them.
 - The mod is not affiliated with Mojang Studios or Microsoft.
 
 ## FAQ
@@ -289,16 +372,28 @@ The script checks that the mod initializes, the commands register, the 80% cover
 No. Every click is handled by the server menu, item movement is disabled, and the shop container is server-owned.
 
 **Can a player buy with a full inventory?**  
-The purchase is refused before money is withdrawn. If the final inventory insert unexpectedly fails, the cost is refunded.
+The purchase is refused before money is withdrawn. If the final inventory insert unexpectedly fails, the cost is refunded and the stock is returned.
+
+**Why did an item sell for less than the base price?**  
+Because the store was already well stocked. The live sell price drops as stock rises and rises when the shelves are empty.
+
+**Why can I not sell this item?**  
+The store is at its stock cap for that item and is not buying more until stock is consumed or the next restock happens.
+
+**Why can I not buy this item?**  
+The shelf is empty. Wait for stock to be sold back or for the next restock.
 
 **Where do I change prices?**  
 Use `/mcstore edit`, `/mcstore setprice`, or edit `config/mcstore/prices.json` and run `/mcstore reload`.
+
+**Where do I change the restock timer or the XP rate?**  
+Edit `restockSeconds` or `xpCentsPerLevel` in `config/mcstore/config.json` and run `/mcstore reload`.
 
 **Why is an item missing from the shop?**  
 It is either blacklisted as technical/creative-only, or there is no price entry for it. `/mcstore setprice` reports unknown items clearly.
 
 **How do I reset the economy?**  
-Stop the server, back up and replace or empty `config/mcstore/balances.json`, then start the server. New players receive `startingBalance`.
+Stop the server, back up and replace or empty `config/mcstore/balances.json`, then start the server. New players receive `startingBalance`. For a market reset, replace `stocks.json` with `{}`.
 
 **Does it work on 26.3?**  
 Not in this release. The mod metadata targets `~26.2`; a 26.3 build requires a new release.

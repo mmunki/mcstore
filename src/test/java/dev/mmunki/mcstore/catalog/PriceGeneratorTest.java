@@ -20,6 +20,14 @@ class PriceGeneratorTest {
     }
 
     @Test
+    void moneyOreIsARareBuyableCommodity() {
+        PriceEntry moneyOre = PriceGenerator.defaultEntry("mcstore:money_ore");
+        assertEquals(RarityTier.RARE, moneyOre.rarity());
+        assertEquals(5_000L, moneyOre.sellCents());
+        assertEquals(15_000L, moneyOre.buyCents());
+    }
+
+    @Test
     void netheriteElytraAndBooksHaveOverrides() {
         assertEquals(22_500L, PriceGenerator.defaultEntry("minecraft:netherite_ingot").sellCents());
         assertEquals(25_000L, PriceGenerator.defaultEntry("minecraft:elytra").sellCents());

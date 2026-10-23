@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "mcstore",
-  "version": "26.2.1",
+  "version": "26.2.2",
   "name": "MCStore",
-  "description": "A client-and-server economy and chest-GUI shop for Fabric. Works in singleplayer worlds and on dedicated servers; vanilla clients can still join a server without the mod.",
+  "description": "A client-and-server economy and chest-GUI shop for Fabric with rarity stock, a restocking market, XP exchange and the overworld/nether Money Ore.",
   "authors": [
     "mmunki"
   ],

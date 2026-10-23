@@ -2,6 +2,7 @@ package dev.mmunki.mcstore;
 
 import dev.mmunki.mcstore.catalog.Coverage;
 import dev.mmunki.mcstore.catalog.ItemClassifier;
+import dev.mmunki.mcstore.catalog.PriceGenerator;
 import dev.mmunki.mcstore.config.AdminList;
 import dev.mmunki.mcstore.config.Balances;
 import dev.mmunki.mcstore.config.PriceBook;
@@ -9,6 +10,8 @@ import dev.mmunki.mcstore.config.PriceEntry;
 import dev.mmunki.mcstore.config.StoreConfig;
 import dev.mmunki.mcstore.economy.Money;
 import dev.mmunki.mcstore.gui.StoreMenu;
+import dev.mmunki.mcstore.market.MarketQuote;
+import dev.mmunki.mcstore.market.StockBook;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -22,36 +25,41 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
 public final class McStore {
-    public static final String VERSION = "26.2.1";
+    public static final String VERSION = "26.2.2";
     private static final Logger LOGGER = LoggerFactory.getLogger("mcstore");
 
     private final Path configDir;
     private final Path configPath;
     private final Path pricesPath;
     private final Path balancesPath;
+    private final Path stocksPath;
     private final Path adminsPath;
 
     private StoreConfig config = new StoreConfig();
     private AdminList admins = new AdminList();
     private PriceBook prices = new PriceBook();
     private Balances balances;
+    private StockBook stocks = StockBook.empty(600);
 
     private MinecraftServer server;
     private List<String> registryIds = List.of();
     private List<String> filteredIds = List.of();
     private volatile boolean ready;
+    private long lastMarketTickMillis;
 
     public McStore(Path configDir) {
         this.configDir = configDir;
         this.configPath = configDir.resolve("config.json");
         this.pricesPath = configDir.resolve("prices.json");
         this.balancesPath = configDir.resolve("balances.json");
+        this.stocksPath = configDir.resolve("stocks.json");
         this.adminsPath = configDir.resolve("admins.json");
         this.balances = Balances.empty(Money.STARTING_BALANCE_CENTS);
     }
@@ -89,10 +97,12 @@ public final class McStore {
                 prices = PriceBook.generate(registryIds);
                 generated = true;
             }
+            ensureModPrices();
             prices.save(pricesPath);
         } catch (IOException | RuntimeException e) {
             LOGGER.error("MCStore could not load prices.json, regenerating defaults", e);
             prices = PriceBook.generate(registryIds);
+            ensureModPrices();
             generated = true;
             try {
                 prices.save(pricesPath);
@@ -109,6 +119,20 @@ public final class McStore {
             balances = Balances.empty(config.startingBalanceCents());
         }
 
+        try {
+            stocks = StockBook.load(stocksPath, config.restockSeconds());
+            stocks.restockIfDue(Instant.now().getEpochSecond());
+            stocks.save(stocksPath);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.error("MCStore could not load stocks.json, starting with full stock", e);
+            stocks = StockBook.empty(config.restockSeconds());
+            try {
+                stocks.save(stocksPath);
+            } catch (IOException saveError) {
+                LOGGER.error("MCStore could not write stocks.json", saveError);
+            }
+        }
+
         ready = true;
         Coverage coverage = coverage();
         LOGGER.info("MCStore {} initialized on Minecraft 26.2 (Fabric)", VERSION);
@@ -118,6 +142,13 @@ public final class McStore {
                 coverage.pricedTotal(), coverage.filteredTotal(), coverage.percentOfFiltered(),
                 coverage.pricedTotal(), coverage.registryTotal(), coverage.percentOfRegistry(),
                 buyableEntries().size());
+        LOGGER.info("MCStore market: stock caps COMMON={} UNCOMMON={} RARE={} EPIC={} LEGENDARY={}, restock every {}s, XP level={}",
+                dev.mmunki.mcstore.catalog.RarityTier.COMMON.defaultStockCapacity(),
+                dev.mmunki.mcstore.catalog.RarityTier.UNCOMMON.defaultStockCapacity(),
+                dev.mmunki.mcstore.catalog.RarityTier.RARE.defaultStockCapacity(),
+                dev.mmunki.mcstore.catalog.RarityTier.EPIC.defaultStockCapacity(),
+                dev.mmunki.mcstore.catalog.RarityTier.LEGENDARY.defaultStockCapacity(),
+                config.restockSeconds(), Money.format(config.xpCentsPerLevel()));
     }
 
     public void stop() {
@@ -128,8 +159,31 @@ public final class McStore {
                 LOGGER.error("MCStore could not save balances.json on shutdown", e);
             }
         }
+        if (stocks != null) {
+            try {
+                stocks.save(stocksPath);
+            } catch (IOException e) {
+                LOGGER.error("MCStore could not save stocks.json on shutdown", e);
+            }
+        }
         this.server = null;
         this.ready = false;
+    }
+
+    /**
+     * Called once per server tick.  The market clock only advances once a
+     * second; when a restock happens, every open shop view is redrawn without
+     * a chat message.
+     */
+    public void tick() {
+        long nowMillis = System.currentTimeMillis();
+        if (nowMillis - lastMarketTickMillis < 1_000L) {
+            return;
+        }
+        lastMarketTickMillis = nowMillis;
+        if (stocks.restockIfDue(nowMillis / 1_000L)) {
+            refreshOpenGuisQuietly();
+        }
     }
 
     public void reload() {
@@ -147,13 +201,24 @@ public final class McStore {
             prices = PriceBook.load(pricesPath);
             if (prices.all().isEmpty()) {
                 prices = PriceBook.generate(registryIds);
-                prices.save(pricesPath);
             }
+            ensureModPrices();
+            prices.save(pricesPath);
         } catch (IOException | RuntimeException e) {
             LOGGER.error("MCStore reload: prices.json is invalid, keeping the previous prices", e);
         }
         if (balances != null) {
             balances.setStartingBalanceCents(config.startingBalanceCents());
+        }
+        try {
+            stocks = StockBook.load(stocksPath, config.restockSeconds());
+            stocks.restockIfDue(Instant.now().getEpochSecond());
+            stocks.save(stocksPath);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.error("MCStore reload: stocks.json is invalid, keeping the previous stock", e);
+            if (stocks != null) {
+                stocks.setRestockSeconds(config.restockSeconds());
+            }
         }
         refreshOpenGuis();
     }
@@ -168,6 +233,20 @@ public final class McStore {
         }
     }
 
+    public boolean saveStocks() {
+        try {
+            stocks.save(stocksPath);
+            return true;
+        } catch (IOException e) {
+            LOGGER.error("MCStore could not write stocks.json", e);
+            return false;
+        }
+    }
+
+    private void ensureModPrices() {
+        prices.ensure(PriceGenerator.defaultEntry(MCStoreContent.MONEY_ORE_ITEM_ID));
+    }
+
     public PriceEntry setPrice(String itemId, boolean buy, long cents) {
         PriceEntry entry = buy ? prices.setBuy(itemId, cents) : prices.setSell(itemId, cents);
         savePrices();
@@ -175,7 +254,30 @@ public final class McStore {
         return entry;
     }
 
+    public MarketQuote quote(PriceEntry entry) {
+        int capacity = entry.rarity().defaultStockCapacity();
+        return MarketQuote.of(entry, stocks.stock(entry.itemId(), capacity));
+    }
+
+    public int stockOf(PriceEntry entry) {
+        return stocks.stock(entry.itemId(), entry.rarity().defaultStockCapacity());
+    }
+
+    public int secondsUntilRestock() {
+        return stocks.secondsUntilRestock(Instant.now().getEpochSecond());
+    }
+
+    public boolean forceRestock() {
+        stocks.restock(Instant.now().getEpochSecond());
+        refreshOpenGuisQuietly();
+        return true;
+    }
+
     public void refreshOpenGuis() {
+        refreshOpenGuis(true);
+    }
+
+    private void refreshOpenGuis(boolean notify) {
         if (server == null) {
             return;
         }
@@ -183,12 +285,27 @@ public final class McStore {
             if (player.containerMenu instanceof StoreMenu menu) {
                 if (config.refreshOpenGuis()) {
                     menu.refresh();
-                    player.sendSystemMessage(Component.literal("MCStore prices updated.").withStyle(net.minecraft.ChatFormatting.YELLOW));
+                    if (notify) {
+                        player.sendSystemMessage(Component.literal("MCStore prices updated.").withStyle(net.minecraft.ChatFormatting.YELLOW));
+                    }
                 } else {
                     player.closeContainer();
-                    player.sendSystemMessage(Component.literal("MCStore prices changed. The store was closed; use /buy or /sell again.")
-                            .withStyle(net.minecraft.ChatFormatting.YELLOW));
+                    if (notify) {
+                        player.sendSystemMessage(Component.literal("MCStore prices changed. The store was closed; use /buy or /sell again.")
+                                .withStyle(net.minecraft.ChatFormatting.YELLOW));
+                    }
                 }
+            }
+        }
+    }
+
+    private void refreshOpenGuisQuietly() {
+        if (server == null) {
+            return;
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.containerMenu instanceof StoreMenu menu && config.refreshOpenGuis()) {
+                menu.refresh();
             }
         }
     }
@@ -246,9 +363,23 @@ public final class McStore {
 
     public String status() {
         Coverage coverage = coverage();
-        return "MCStore %s · %d sellable / %d filtered items (%d%%) · %d buyable ores · %d registry items"
+        int seconds = secondsUntilRestock();
+        String restock = seconds < 0 ? "automatic restock off" : "restock in " + formatDuration(seconds);
+        return "MCStore %s · %d sellable / %d filtered items (%d%%) · %d buyable ores · %d registry items · %s"
                 .formatted(VERSION, coverage.pricedTotal(), coverage.filteredTotal(),
-                        coverage.percentOfFiltered(), buyableEntries().size(), coverage.registryTotal());
+                        coverage.percentOfFiltered(), buyableEntries().size(), coverage.registryTotal(), restock);
+    }
+
+    public static String formatDuration(int seconds) {
+        if (seconds < 0) {
+            return "off";
+        }
+        int minutes = seconds / 60;
+        int rest = seconds % 60;
+        if (minutes >= 60) {
+            return (minutes / 60) + "h " + String.format("%02d", minutes % 60) + "m";
+        }
+        return String.format("%d:%02d", minutes, rest);
     }
 
     public boolean isAdmin(CommandSourceStack source) {
@@ -278,6 +409,10 @@ public final class McStore {
         return balances;
     }
 
+    public StockBook stocks() {
+        return stocks;
+    }
+
     public boolean ready() {
         return ready;
     }
@@ -292,6 +427,10 @@ public final class McStore {
 
     public Path balancesPath() {
         return balancesPath;
+    }
+
+    public Path stocksPath() {
+        return stocksPath;
     }
 
     public MinecraftServer server() {

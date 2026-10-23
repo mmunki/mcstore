@@ -71,6 +71,7 @@ public final class PriceGenerator {
         put(map, "quartz", RarityTier.UNCOMMON, 900L, 2_250L);
         put(map, "quartz_block", RarityTier.UNCOMMON, 1_300L, 3_250L);
         put(map, "diamond", RarityTier.RARE, 4_000L, 12_000L);
+        put(map, "money_ore", RarityTier.RARE, 5_000L, 15_000L);
         put(map, "diamond_block", RarityTier.EPIC, 9_000L, 31_500L);
         put(map, "emerald", RarityTier.RARE, 3_500L, 10_500L);
         put(map, "emerald_block", RarityTier.EPIC, 8_000L, 28_000L);
