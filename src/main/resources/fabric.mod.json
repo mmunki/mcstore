@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "mcstore",
-  "version": "26.2",
+  "version": "26.2.1",
   "name": "MCStore",
-  "description": "A server-side-only economy and chest-GUI shop for Fabric servers. Buy ores, sell almost everything, and edit prices live. Vanilla clients can join; no client mod is required.",
+  "description": "A client-and-server economy and chest-GUI shop for Fabric. Works in singleplayer worlds and on dedicated servers; vanilla clients can still join a server without the mod.",
   "authors": [
     "mmunki"
   ],
@@ -14,9 +14,9 @@
   },
   "license": "MIT",
   "icon": "assets/mcstore/icon.png",
-  "environment": "server",
+  "environment": "*",
   "entrypoints": {
-    "server": [
+    "main": [
       "dev.mmunki.mcstore.MCStoreMod"
     ]
   },

@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="docs/banner.png" alt="MCStore — server-side economy and chest-GUI shop for Fabric" width="100%">
+  <img src="docs/banner.png" alt="MCStore — economy and chest-GUI shop for Fabric, singleplayer and servers" width="100%">
 </p>
 
 <h1 align="center">MCStore</h1>
 
 <p align="center">
-  A server-side economy and chest-GUI shop for Fabric servers.<br>
-  Buy ores and minerals, sell almost everything, and edit prices live. Vanilla clients can join; no client mod is required.
+  An economy and chest-GUI shop for Fabric that works in singleplayer worlds and on dedicated servers.<br>
+  Buy ores and minerals, sell almost everything, and edit prices live. Vanilla clients can still join a server without the mod.
 </p>
 
 <p align="center">
   <img alt="Minecraft 26.2" src="https://img.shields.io/badge/Minecraft-26.2-3c8527?style=flat-square">
-  <img alt="Fabric" src="https://img.shields.io/badge/Fabric-server--side-dbb69c?style=flat-square">
+  <img alt="Fabric" src="https://img.shields.io/badge/Fabric-client%20%2B%20server-dbb69c?style=flat-square">
   <img alt="Java 25" src="https://img.shields.io/badge/Java-25-e76f00?style=flat-square">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-blue?style=flat-square">
 </p>
@@ -20,9 +20,9 @@
 
 ## A shop that feels native
 
-MCStore adds a small, focused economy to a Fabric server. Players open a normal chest interface, buy the ores and minerals they need, and sell the extra items they already have. Admins get a live price editor and a JSON price book that can be versioned, backed up, or generated once and edited by hand.
+MCStore adds a small, focused economy to a Fabric world. Players open a normal chest interface, buy the ores and minerals they need, and sell the extra items they already have. Admins get a live price editor and a JSON price book that can be versioned, backed up, or generated once and edited by hand.
 
-There is no client component, no custom item, no custom block and no custom menu type. The shop uses Minecraft's own chest menu, so a vanilla client sees a normal 9x6 chest and needs no downloads.
+The same jar runs in **singleplayer worlds** (the integrated server) and on **dedicated servers**. There is no custom item, no custom block and no custom menu type: the shop uses Minecraft's own chest menu, so a vanilla client can join a server that has the mod and needs no downloads.
 
 ## Features
 
@@ -35,7 +35,7 @@ There is no client component, no custom item, no custom block and no custom menu
 | **Live admin editor** | `/mcstore edit` opens a draft editor with buy/sell switching, +/- buttons and Save & Reload. |
 | **Immediate command edits** | `/mcstore setprice <item> <buy\|sell> <price>` writes the file and refreshes open shop views. |
 | **Deterministic defaults** | The same item id always gets the same generated price, and prices stay inside their rarity band. |
-| **Server-side only** | No client entrypoint and no registry content. Remove the jar and the server is clean again. |
+| **Client + server** | One universal jar works in singleplayer and on servers. No registry content; remove the jar and the game is clean again. |
 | **Small release** | The release JAR is well below 1 MB. |
 
 ## Preview
@@ -60,9 +60,18 @@ There is no client component, no custom item, no custom block and no custom menu
 | Fabric API | **0.161.0+26.2** or newer for 26.2 |
 | Java | **25** |
 
-MCStore is built for the 26.2 line. The mod metadata declares `minecraft: "~26.2"`, so a 26.3 server will refuse to load it until a matching build is published.
+MCStore is built for the 26.2 line. The mod metadata declares `minecraft: "~26.2"`, so a 26.3 game will refuse to load it until a matching build is published.
 
 ## Installation
+
+### Singleplayer / client
+
+1. Install **Fabric Loader** for Minecraft **26.2** using the official installer.
+2. Put **Fabric API** and **MCStore** into `.minecraft/mods/` (or your launcher profile's `mods/` directory).
+3. Start the game and open or create a world. MCStore creates `config/mcstore/` and registers `/buy`, `/sell`, `/balance` and `/mcstore`.
+4. Run `/buy` or `/sell` to open the shop. In a survival world without cheats, `/buy`, `/sell` and `/balance` still work; `/mcstore` needs cheats/op or a UUID in `admins.json`.
+
+### Dedicated server
 
 1. Install a Fabric server for Minecraft **26.2**. The official Fabric installer works:
    ```bash
@@ -73,7 +82,7 @@ MCStore is built for the 26.2 line. The mod metadata declares `minecraft: "~26.2
 4. Join as an operator (or add your UUID to `admins.json`) and run `/mcstore` to see the status.
 5. Run `/buy` or `/sell` to open the shop.
 
-No client-side installation is needed.
+No client-side installation is needed to join a server, but installing the same jar on the client enables the shop in singleplayer. The jar is one universal build, not separate client and server downloads.
 
 ## Commands
 
@@ -250,7 +259,7 @@ Requirements: JDK **25** and network access to the Fabric Maven repository.
 ./gradlew build
 ```
 
-The build produces `build/libs/MCStore-26.2.jar` (and a lowercase copy, `build/libs/mcstore-26.2.jar`). The jar is the only build output that should be published.
+The build produces `build/libs/MCStore-26.2.1.jar` (and a lowercase copy, `build/libs/mcstore-26.2.1.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
 
 ### Tests
 
@@ -269,8 +278,8 @@ The script checks that the mod initializes, the commands register, the 80% cover
 ## Compatibility notes
 
 - **Minecraft 26.2** only in this release.
-- **Server-side**: install on the server, not the client.
-- **Vanilla clients**: the shop uses a vanilla chest menu and vanilla item components.
+- **Client + server**: one universal jar. Install it on the client for singleplayer and on the server for multiplayer; the same file works in both places.
+- **Vanilla clients**: a client without the mod can still join a server that has it; the shop uses a vanilla chest menu and vanilla item components.
 - **Other server-side mods** are generally fine. If another mod already registers `/buy`, `/sell`, `/balance` or `/mcstore`, the command trees may conflict; remove or rename one of them.
 - The mod is not affiliated with Mojang Studios or Microsoft.
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## 26.2.1 — 2026-10-23
+
+### Fixed
+
+- The jar now declares `environment: "*"` and a common `main` entrypoint instead of a
+  server-only entrypoint. Fabric Loader no longer skips it on a client, so MCStore loads
+  in singleplayer worlds (the integrated server) as well as on dedicated servers.
+- `/buy`, `/sell`, `/balance` and `/mcstore` are now registered in singleplayer, which also
+  restores their slash-command and item-id tab completion there. Previously the mod was
+  never initialized on a client, so no commands existed to suggest.
+- The price book and balances are reloaded per world session, so entering a world after
+  leaving another one restores the store correctly.
+
+### Changed
+
+- One universal client + server jar. The same `MCStore-26.2.1.jar` goes into a client
+  `mods/` folder or a server `mods/` folder; there is no modpack.
+- Added a metadata unit test and a smoke-test check that fail if the jar ever becomes
+  server-only again.
+
 ## 26.2 — 2026-10-23
 
 Initial release for Minecraft 26.2.

@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 public final class McStore {
-    public static final String VERSION = "26.2";
+    public static final String VERSION = "26.2.1";
     private static final Logger LOGGER = LoggerFactory.getLogger("mcstore");
 
     private final Path configDir;
