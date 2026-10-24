@@ -205,7 +205,7 @@ public final class StoreCommands {
 
     private static int restock(CommandSourceStack source, McStore store) {
         store.forceRestock();
-        source.sendSuccess(() -> Component.literal("MCStore market restocked: every item is back at full stock.")
+        source.sendSuccess(() -> Component.literal("MCStore market restocked: every item is back at half of its cap.")
                 .withStyle(ChatFormatting.GREEN), false);
         return 1;
     }

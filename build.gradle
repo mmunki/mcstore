@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'dev.mmunki'
-version = '26.2.3'
+version = '26.2.4'
 
 base {
     archivesName = 'mcstore'

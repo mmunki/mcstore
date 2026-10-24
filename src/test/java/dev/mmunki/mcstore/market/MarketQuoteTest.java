@@ -50,6 +50,18 @@ class MarketQuoteTest {
     }
 
     @Test
+    void freshMarketHasRoomToSellEveryRarity() {
+        StockBook book = StockBook.empty(600);
+        for (RarityTier tier : RarityTier.values()) {
+            PriceEntry entry = new PriceEntry("minecraft:test_" + tier.name(), tier, null, 1_000L);
+            MarketQuote quote = MarketQuote.of(entry, book.stock(entry.itemId(), tier.defaultStockCapacity()));
+            assertTrue(quote.stock() > 0, tier.name() + " has no stock to buy");
+            assertTrue(quote.availableToSell() > 0, tier.name() + " has no room to sell");
+            assertEquals(1_000L, quote.sellCents(), tier.name());
+        }
+    }
+
+    @Test
     void rarityCapsAreOrdered() {
         assertTrue(RarityTier.COMMON.defaultStockCapacity() > RarityTier.UNCOMMON.defaultStockCapacity());
         assertTrue(RarityTier.UNCOMMON.defaultStockCapacity() > RarityTier.RARE.defaultStockCapacity());

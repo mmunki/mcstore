@@ -18,14 +18,16 @@ import java.util.TreeMap;
 /**
  * Persistent stock levels for the shop, plus the restock clock.
  *
- * <p>An item with no entry in the map is at full stock.  This is deliberate:
- * a fresh world (and every restock) starts with every item fully stocked, and
- * the file only stores items that have been traded down from the cap.</p>
+ * <p>An item with no entry in the map is at its resting stock: half of its
+ * cap.  This is deliberate.  A fresh world (and every restock) must have room
+ * for players to sell, so the shelves cannot start completely full, but they
+ * also need enough stock to buy from.  At half stock the supply factor is
+ * exactly 1.0, so the live price equals the base price after a restock.</p>
  */
 public final class StockBook {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-    private static final String COMMENT = "MCStore stock. An item that is not listed is at full stock. "
-            + "lastRestock is Unix epoch seconds; restockSeconds=0 disables automatic restocking.";
+    private static final String COMMENT = "MCStore stock. An item that is not listed is at its resting stock "
+            + "(half of its cap). lastRestock is Unix epoch seconds; restockSeconds=0 disables automatic restocking.";
 
     private final Map<String, Integer> stocks = new TreeMap<>();
     private long lastRestockEpochSecond;
@@ -82,9 +84,17 @@ public final class StockBook {
         int cap = Math.max(0, capacity);
         Integer value = stocks.get(itemId);
         if (value == null) {
-            return cap;
+            return restingStock(cap);
         }
         return Math.max(0, Math.min(cap, value));
+    }
+
+    /**
+     * The stock an item has on a fresh world and after every restock.  Half
+     * of the cap leaves room to sell and still leaves stock to buy.
+     */
+    public static int restingStock(int capacity) {
+        return Math.max(0, capacity) / 2;
     }
 
     public synchronized int add(String itemId, int amount, int capacity) {

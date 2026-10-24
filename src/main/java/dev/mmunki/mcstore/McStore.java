@@ -32,7 +32,7 @@ import java.util.Collections;
 import java.util.List;
 
 public final class McStore {
-    public static final String VERSION = "26.2.3";
+    public static final String VERSION = "26.2.4";
     private static final Logger LOGGER = LoggerFactory.getLogger("mcstore");
 
     private final Path configDir;
@@ -124,7 +124,7 @@ public final class McStore {
             stocks.restockIfDue(Instant.now().getEpochSecond());
             stocks.save(stocksPath);
         } catch (IOException | RuntimeException e) {
-            LOGGER.error("MCStore could not load stocks.json, starting with full stock", e);
+            LOGGER.error("MCStore could not load stocks.json, starting at the resting stock", e);
             stocks = StockBook.empty(config.restockSeconds());
             try {
                 stocks.save(stocksPath);

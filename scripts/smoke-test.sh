@@ -23,7 +23,7 @@ fi
 JAVA_VERSION="$("$JAVA" -version 2>&1 | awk -F'"' '/version/ {print $2; exit}')"
 JAVA_MAJOR="${JAVA_VERSION%%.*}"
 if [ "$JAVA_MAJOR" -ne 25 ]; then
-    echo "error: MCStore 26.2.3 needs Java 25, found $JAVA_VERSION ($JAVA)" >&2
+    echo "error: MCStore 26.2.4 needs Java 25, found $JAVA_VERSION ($JAVA)" >&2
     exit 1
 fi
 
@@ -38,7 +38,7 @@ mkdir -p "$SMOKE" "$CACHE" "$SERVER"
 
 echo "==> building MCStore"
 "$ROOT/gradlew" --no-daemon --console=plain build
-JAR="$ROOT/build/libs/MCStore-26.2.3.jar"
+JAR="$ROOT/build/libs/MCStore-26.2.4.jar"
 [ -s "$JAR" ] || {
     echo "error: build did not produce $JAR" >&2
     exit 1
@@ -87,7 +87,7 @@ fi
 rm -rf "$SERVER/mods" "$SERVER/config/mcstore" "$SERVER/world" \
        "$SERVER/logs" "$SERVER/crash-reports" "$LOG"
 mkdir -p "$SERVER/mods"
-cp "$JAR" "$SERVER/mods/MCStore-26.2.3.jar"
+cp "$JAR" "$SERVER/mods/MCStore-26.2.4.jar"
 cp "$API" "$SERVER/mods/fabric-api-0.161.0+26.2.jar"
 
 printf 'eula=true\n' > "$SERVER/eula.txt"
@@ -234,13 +234,13 @@ text = open(log_path, encoding="utf-8").read()
 
 required = [
     "Loading Minecraft 26.2 with Fabric Loader 0.20.1",
-    "MCStore 26.2.3 loaded (client + server, singleplayer worlds supported",
-    "MCStore 26.2.3 initialized on Minecraft 26.2 (Fabric)",
+    "MCStore 26.2.4 loaded (client + server, singleplayer worlds supported",
+    "MCStore 26.2.4 initialized on Minecraft 26.2 (Fabric)",
     "MCStore commands registered: /buy /sell /exchange /stock /balance /mcstore",
     "MCStore market: stock caps",
     "Coverage target 80%: PASS",
     "Only a player can open the store.",
-    "Stock minecraft:diamond: 64/64",
+    "Stock minecraft:diamond: 32/64",
     "MCStore market restocked",
     "Changed the block at 0, 100, 0",
     "Set sell price of minecraft:diamond to 55.00",
@@ -352,7 +352,7 @@ if not match:
 defaults, sellable, filtered, filtered_pct, registry_priced, registry_total, registry_pct, buyable = match.groups()
 summary = (
     "status: passed\n"
-    "mod: 26.2.3\n"
+    "mod: 26.2.4\n"
     "minecraft: 26.2\n"
     "fabric-loader: 0.20.1\n"
     "fabric-api: 0.161.0+26.2\n"
@@ -361,7 +361,7 @@ summary = (
     f"registry-covered: {registry_priced} of {registry_total} ({registry_pct}%)\n"
     f"buyable: {buyable}\n"
     "stock-system: passed\n"
-    "stock-cap-diamond: 64/64\n"
+    "stock-cap-diamond: 32/64\n"
     "xp-exchange-rate: 1.00 per level\n"
     "money-ore-block: registered\n"
     "money-ore-overworld: generated\n"

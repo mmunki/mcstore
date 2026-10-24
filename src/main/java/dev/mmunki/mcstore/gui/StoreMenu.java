@@ -268,7 +268,7 @@ public final class StoreMenu extends ChestMenu {
                 "Next restock: " + McStore.formatDuration(store.secondsUntilRestock()),
                 ChatFormatting.YELLOW,
                 List.of("Stock is consumed by buying and replenished by selling.",
-                        "A full restock refills every market item.")));
+                        "A restock returns every market item to half of its cap.")));
     }
 
     private void buildSellFooter(int count) {

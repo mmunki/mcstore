@@ -30,7 +30,7 @@ The shop is a normal chest interface, so it feels native and needs no custom men
 | --- | --- |
 | **Chest-GUI shop** | `/buy` and `/sell` open a paged 9x6 chest. Every click is verified by the server. |
 | **Rarity stock caps** | Common items have 512 units, uncommon 256, rare 64, epic 16, legendary 4. |
-| **Restocking market** | Every 600 seconds the market refills to full stock. The GUI and `/stock` show the countdown. |
+| **Restocking market** | Every 600 seconds the market returns to half stock, leaving room to buy and sell. The GUI and `/stock` show the countdown. |
 | **Real supply and demand** | Buying removes stock and raises the live price; selling adds stock and lowers it. Prices move between -25% and +25% from the base price. |
 | **Sell-to-restock** | A sold ore is immediately available for another player to buy. A completely full item stops buying. |
 | **Money Ore** | A rare ore, similar to diamond, that generates in overworld stone/deepslate and in netherrack. |
@@ -128,25 +128,27 @@ Item arguments accept both `minecraft:diamond` and the short form `diamond`. Pri
 
 ### The stock market
 
-Every tradable item has a stock level and a cap that depends on rarity:
+Every tradable item has a stock level and a cap that depends on rarity. A fresh
+world and every restock use the **resting stock**, which is half of the cap:
 
-| Rarity | Stock cap | Restock |
+| Rarity | Stock cap | Resting stock |
 | --- | --- | --- |
-| Common | 512 | Full |
-| Uncommon | 256 | Full |
-| Rare | 64 | Full |
-| Epic | 16 | Full |
-| Legendary | 4 | Full |
+| Common | 512 | 256 |
+| Uncommon | 256 | 128 |
+| Rare | 64 | 32 |
+| Epic | 16 | 8 |
+| Legendary | 4 | 2 |
 
-The default cycle is **600 seconds** (`restockSeconds` in `config.json`). A restock sets every item back to its cap. `restockSeconds: 0` disables automatic restocks.
+The default cycle is **600 seconds** (`restockSeconds` in `config.json`). A restock sets every item back to its resting stock. That deliberately leaves stock to buy and room to sell; a completely full shelf would refuse every sale. `restockSeconds: 0` disables automatic restocks.
 
 Prices are quoted from the base price in `prices.json` and a supply factor:
 
+- **Half stock**: base price (stable).
 - **Full stock**: base price × 0.75 (oversupplied).
 - **Empty stock**: base price × 1.25 (scarce).
 - The market is never off by more than ±25%, so prices stay readable and the base price remains an admin control.
 
-Buying consumes stock, which pushes the next quote up. Selling adds stock, which pushes the next quote down. If an item is at its cap, the store stops buying it until stock is consumed or the next restock happens. If an item has no stock left, buying is refused until it is sold back or restocked.
+Buying consumes stock, which pushes the next quote up. Selling adds stock, which pushes the next quote down. If an item is at its cap, the store stops buying it until stock is consumed or the next restock returns it to the resting level. If an item has no stock left, buying is refused until it is sold back or restocked.
 
 This makes holding goods a real investment: buy while the shelves are full and cheap, then sell when the market is scarce and pays more.
 
@@ -276,7 +278,7 @@ All files live in `config/mcstore/` relative to the server directory.
 
 ```json
 {
-  "_comment": "MCStore stock. An item that is not listed is at full stock.",
+  "_comment": "MCStore stock. An item that is not listed is at its resting stock (half of its cap).",
   "restockSeconds": 600,
   "lastRestock": 1792741200,
   "stocks": {
@@ -286,7 +288,7 @@ All files live in `config/mcstore/` relative to the server directory.
 }
 ```
 
-- Items that are not listed are at full stock. Only items traded below the cap are written here.
+- Items that are not listed are at their resting stock (half of the cap). Only items that have been traded are written here.
 - `lastRestock` is Unix epoch seconds and drives the countdown.
 - `stocks.json` is rewritten atomically after every trade, restock and shutdown.
 - To reset the market, replace the file with `{}` (or delete it) while the server is stopped, then start the server.
@@ -359,7 +361,7 @@ Requirements: JDK **25** and network access to the Fabric Maven repository.
 ./gradlew build
 ```
 
-The build produces `build/libs/MCStore-26.2.3.jar` (and a lowercase copy, `build/libs/mcstore-26.2.3.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
+The build produces `build/libs/MCStore-26.2.4.jar` (and a lowercase copy, `build/libs/mcstore-26.2.4.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
 
 ### Tests
 

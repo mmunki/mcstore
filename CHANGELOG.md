@@ -1,5 +1,42 @@
 # Changelog
 
+## 26.2.4 — 2026-10-24
+
+### Fixed
+
+- Selling works again. A fresh market and every restock used to put every item
+  at its full stock cap, so `availableToSell()` was zero for all items and
+  `/sell`, `/sell all`, `/sell hand` and the sell chest refused every sale with
+  "the store is fully stocked". The market now uses a **resting stock of half
+  the cap** (common 256, uncommon 128, rare 32, epic 8, legendary 2), so every
+  item has room to sell and still has stock to buy.
+- The live price is now exactly the base price at the resting stock, because
+  the supply factor is 1.0 at half fill. Restocking no longer immediately
+  applies the -25% oversupply price to every item.
+- Added regression tests that a fresh market has both stock to buy and room to
+  sell for every rarity, and that a restock restores that room.
+
+### Changed
+
+- `stocks.json` documents the resting stock instead of full stock. Items that
+  are not listed use half of their cap. Existing files keep their explicit
+  stock values; a restock clears them back to the resting level.
+- Jar version is 26.2.4.
+
+### Verified
+
+- Unit tests: 58 passing.
+- Fabric 26.2 dedicated-server smoke test on Linux x86_64, Java 25:
+  - Fabric Loader 0.20.1, Fabric API 0.161.0+26.2
+  - mod initialized and all command roots registered
+  - 1,422 price entries, 100% filtered coverage
+  - fresh and restocked diamond stock is 32/64, leaving room to sell
+  - block prices persisted at 8.90× their material price
+  - stock, forced restock and `stocks.json` verified
+  - Money Ore placement and overworld/nether generation verified
+  - `/mcstore setprice` and `/mcstore reload` verified
+- Release JAR is published as an asset of the `mcstore-26.2.4` release.
+
 ## 26.2.3 — 2026-10-24
 
 ### Added
