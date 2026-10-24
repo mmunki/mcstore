@@ -71,6 +71,25 @@ class PriceBookTest {
     }
 
     @Test
+    void legacyFilesMigrateMineralBlocksOnce() throws IOException {
+        Path file = tempDir.resolve("prices.json");
+        Files.writeString(file, """
+                {
+                  "minecraft:iron_ingot": {"rarity": "UNCOMMON", "buy": 25.00, "sell": 10.00},
+                  "minecraft:iron_block": {"rarity": "UNCOMMON", "buy": 37.50, "sell": 15.00}
+                }
+                """);
+        PriceBook migrated = PriceBook.load(file);
+        assertEquals(8_900L, migrated.get("minecraft:iron_block").sellCents());
+        assertEquals(22_250L, migrated.get("minecraft:iron_block").buyCents());
+
+        migrated.setSell("minecraft:iron_block", 500L);
+        migrated.save(file);
+        PriceBook loaded = PriceBook.load(file);
+        assertEquals(500L, loaded.get("minecraft:iron_block").sellCents());
+    }
+
+    @Test
     void ensureAddsMissingEntriesWithoutOverwritingEditedOnes() {
         PriceBook book = PriceBook.generate(List.of("minecraft:diamond"));
         PriceEntry moneyOre = PriceGenerator.defaultEntry("mcstore:money_ore");

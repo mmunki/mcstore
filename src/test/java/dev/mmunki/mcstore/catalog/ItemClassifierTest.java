@@ -35,6 +35,32 @@ class ItemClassifierTest {
     }
 
     @Test
+    void mineralBlocksKnowTheirBaseMaterial() {
+        assertEquals("iron_ingot", ItemClassifier.blockBase("minecraft:iron_block"));
+        assertEquals("raw_iron", ItemClassifier.blockBase("minecraft:raw_iron_block"));
+        assertEquals("diamond", ItemClassifier.blockBase("minecraft:diamond_block"));
+        assertEquals("netherite_ingot", ItemClassifier.blockBase("minecraft:netherite_block"));
+        assertEquals(null, ItemClassifier.blockBase("minecraft:stone"));
+        assertTrue(ItemClassifier.isMineralBlock("minecraft:coal_block"));
+        assertTrue(ItemClassifier.isBuyable("minecraft:coal_block"));
+    }
+
+    @Test
+    void oresAndMineralsAreSeparateSellCategories() {
+        assertTrue(ItemClassifier.isOre("minecraft:iron_ore"));
+        assertTrue(ItemClassifier.isOre("minecraft:raw_iron"));
+        assertTrue(ItemClassifier.isOre("minecraft:ancient_debris"));
+        assertTrue(ItemClassifier.isOre("mcstore:money_ore"));
+        assertFalse(ItemClassifier.isOre("minecraft:raw_iron_block"));
+        assertFalse(ItemClassifier.isOre("minecraft:iron_ingot"));
+        assertTrue(ItemClassifier.isMineral("minecraft:iron_ingot"));
+        assertTrue(ItemClassifier.isMineral("minecraft:diamond"));
+        assertTrue(ItemClassifier.isMineral("minecraft:iron_ore"));
+        assertTrue(ItemClassifier.isMineral("minecraft:iron_block"));
+        assertFalse(ItemClassifier.isMineral("minecraft:oak_log"));
+    }
+
+    @Test
     void technicalAndCreativeOnlyItemsAreBlacklisted() {
         for (String id : new String[]{
                 "minecraft:air", "minecraft:barrier", "minecraft:command_block",

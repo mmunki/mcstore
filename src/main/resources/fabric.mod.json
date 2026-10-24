@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "mcstore",
-  "version": "26.2.2",
+  "version": "26.2.3",
   "name": "MCStore",
   "description": "A client-and-server economy and chest-GUI shop for Fabric with rarity stock, a restocking market, XP exchange and the overworld/nether Money Ore.",
   "authors": [

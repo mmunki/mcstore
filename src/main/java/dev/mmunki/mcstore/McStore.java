@@ -32,7 +32,7 @@ import java.util.Collections;
 import java.util.List;
 
 public final class McStore {
-    public static final String VERSION = "26.2.2";
+    public static final String VERSION = "26.2.3";
     private static final Logger LOGGER = LoggerFactory.getLogger("mcstore");
 
     private final Path configDir;

@@ -37,6 +37,9 @@ The shop is a normal chest interface, so it feels native and needs no custom men
 | **XP exchange** | `/exchange` opens a chest GUI that converts experience levels to money at a configurable rate. |
 | **Buy ores and minerals** | Ores, raw materials, ingots, nuggets, scraps and useful mineral blocks are buyable. |
 | **Sell almost everything** | Every non-blacklisted vanilla item gets a generated sell price, including blocks, tools, food and drops. |
+| **Sell categories** | The sell menu has separate Ores, Blocks, Minerals and All views. |
+| **Sell chest** | `/sell chest` opens a deposit chest: sell one of each, a stack of each, the whole chest, your whole inventory or the held stack. |
+| **Block pricing** | Mineral storage blocks are priced from their base material at **8.90×** instead of being treated as unrelated items. |
 | **Persistent economy** | Balances are stored as integer cents in `balances.json`; stock and the restock clock live in `stocks.json`. |
 | **Live admin editor** | `/mcstore edit` opens a draft editor with buy/sell switching, +/- buttons and Save & Reload. |
 | **Immediate command edits** | `/mcstore setprice <item> <buy\|sell> <price>` writes the file and refreshes open shop views. |
@@ -95,7 +98,8 @@ Install the same jar on the client for singleplayer worlds and to see the Money 
 | --- | --- | --- |
 | `/buy` | Player | Open the buy GUI. |
 | `/buy <item>` | Player | Buy one of a buyable item directly, for example `/buy minecraft:diamond`. |
-| `/sell` | Player | Open the sell GUI. |
+| `/sell` | Player | Open the sell GUI with Ores, Blocks, Minerals and All categories. |
+| `/sell chest` | Player | Open the sell chest to deposit items and sell one, a stack, the chest or your inventory. |
 | `/sell hand` | Player | Sell the stack you are holding. |
 | `/sell all` | Player | Sell every sellable item in your inventory (subject to stock space). |
 | `/exchange` | Player | Open the XP-to-money exchange GUI. |
@@ -158,6 +162,14 @@ This makes holding goods a real investment: buy while the shelves are full and c
 
 - Click an item to sell **one**.
 - Shift-click to sell **all of that item** currently in your inventory, limited by remaining stock space.
+- The footer filters the list into **Ores**, **Blocks**, **Minerals** and **All**. The selected category is highlighted.
+- **Open sell chest** (or `/sell chest`) opens a deposit chest. Put any block, ore, tool or other item in the top 45 slots, then choose:
+  - **Sell 1 of each** - one unit from every item type in the chest.
+  - **Sell a stack of each** - up to one stack of every item type in the chest.
+  - **Sell everything in the chest** - every sellable deposited item.
+  - **Sell entire inventory** - every sellable item you carry.
+  - **Sell held item** and **Return chest items** are also available.
+- Items that cannot be sold stay in the chest. Closing or leaving returns the remaining chest contents to your inventory (or drops them at your feet if it is full).
 - `/sell hand` sells the held stack. `/sell all` walks the inventory and sells every item that has a price and stock space.
 - Sale proceeds are credited immediately and the new balance is written to disk.
 
@@ -179,9 +191,13 @@ This makes holding goods a real investment: buy while the shelves are full and c
 
 ### Paging and navigation
 
-The shop shows 45 entries per page. The bottom row holds the page arrows, balance, page number, restock clock, XP-exchange shortcut and close button. Display items cannot be removed: all clicks are intercepted by the server menu, and shift-click item movement is disabled.
+The shop shows 45 entries per page. The bottom row holds the page arrows, balance, category filters, sell-chest shortcut and close button. Display items cannot be removed from the buy/sell lists: all clicks are intercepted by the server menu. The sell chest is the only screen that accepts item movement, and it only accepts items into its 45 deposit slots.
 
 ## Prices and rarity
+
+Mineral storage blocks (for example `iron_block`, `raw_iron_block`, `diamond_block` and `netherite_block`) are priced from the material they are crafted from at **8.90×** the base price. A block is nine materials in the crafting grid, so 8.90× keeps a block slightly cheaper than nine separate units while making blocks worth selling. The multiplier applies to both the sell and buy price and uses the material's rarity.
+
+An existing `prices.json` is migrated once: mineral block entries are replaced with the 8.90× price and the file receives a `_version` marker. After that, `/mcstore setprice` and the editor keep your block prices untouched.
 
 MCStore uses five rarity bands. Default sell prices are deterministic and stay inside the band. Generated buy prices are between **2x and 4x** the sell price; the multiplier rises with rarity.
 
@@ -343,11 +359,11 @@ Requirements: JDK **25** and network access to the Fabric Maven repository.
 ./gradlew build
 ```
 
-The build produces `build/libs/MCStore-26.2.2.jar` (and a lowercase copy, `build/libs/mcstore-26.2.2.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
+The build produces `build/libs/MCStore-26.2.3.jar` (and a lowercase copy, `build/libs/mcstore-26.2.3.jar`). The jar is the only build output that should be published. It is a universal client + server mod (`environment: "*"`), so the same file goes into a client `mods/` folder or a server `mods/` folder.
 
 ### Tests
 
-The repository contains 46 unit tests for rarity bands, price generation, blacklist and buyable classification, coverage math, JSON price persistence, stock persistence, market quotes, balance persistence, config parsing and the item-id command argument.
+The repository contains unit tests for rarity bands, price generation, block pricing, sell categories, blacklist and buyable classification, coverage math, JSON price persistence, stock persistence, market quotes, balance persistence, config parsing and the item-id command argument.
 
 ### Smoke test
 

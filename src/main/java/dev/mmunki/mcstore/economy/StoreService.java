@@ -9,10 +9,12 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -174,6 +176,56 @@ public final class StoreService {
         store.balances().add(player.getUUID(), total);
         player.sendSystemMessage(success("Sold " + totalItems + " items for " + Money.format(total)
                 + ". Balance: " + Money.format(store.balances().balance(player.getUUID()))));
+        return true;
+    }
+
+    public boolean sellContainer(ServerPlayer player, Container container, int perItemLimit) {
+        Map<String, Integer> sold = new HashMap<>();
+        long total = 0L;
+        int totalItems = 0;
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack stack = container.getItem(slot);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            String itemId = idOf(stack);
+            PriceEntry entry = store.prices().get(itemId);
+            if (entry == null) {
+                continue;
+            }
+            int already = sold.getOrDefault(itemId, 0);
+            if (perItemLimit > 0 && already >= perItemLimit) {
+                continue;
+            }
+            MarketQuote quote = store.quote(entry);
+            int space = quote.availableToSell();
+            if (space <= 0) {
+                continue;
+            }
+            int budget = perItemLimit > 0 ? perItemLimit - already : Integer.MAX_VALUE;
+            int wanted = Math.min(Math.min(stack.getCount(), space), budget);
+            if (wanted <= 0) {
+                continue;
+            }
+            int added = store.stocks().add(itemId, wanted, quote.capacity());
+            if (added <= 0) {
+                continue;
+            }
+            stack.shrink(added);
+            container.setItem(slot, stack.isEmpty() ? ItemStack.EMPTY : stack);
+            total = Math.addExact(total, Math.multiplyExact(quote.sellCents(), (long) added));
+            totalItems += added;
+            sold.merge(itemId, added, Integer::sum);
+        }
+        if (totalItems == 0) {
+            player.sendSystemMessage(error("Nothing in the sell chest can be sold right now."));
+            return false;
+        }
+        store.balances().add(player.getUUID(), total);
+        container.setChanged();
+        player.sendSystemMessage(success("Sold " + totalItems + " items from the sell chest for "
+                + Money.format(total) + ". Balance: "
+                + Money.format(store.balances().balance(player.getUUID()))));
         return true;
     }
 

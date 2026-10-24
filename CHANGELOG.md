@@ -1,5 +1,47 @@
 # Changelog
 
+## 26.2.3 — 2026-10-24
+
+### Added
+
+- Sell categories: the `/sell` menu now has **Ores**, **Blocks**, **Minerals**
+  and **All** views. The selected category is highlighted and paging restarts
+  at page 1 when the filter changes.
+- A **sell chest**: `/sell chest` or the **Open sell chest** button opens a
+  deposit chest. Items placed in the 45 top slots can be sold as one of each,
+  one stack of each, the whole chest, the whole player inventory or the held
+  stack. Leftover items are returned on close, back or return.
+- Mineral storage blocks are now priced from their base material at **8.90×**
+  for both sell and buy. This covers coal, copper, raw copper, iron, raw iron,
+  gold, raw gold, redstone, lapis, quartz, amethyst, diamond, emerald and
+  netherite blocks. Storage blocks are buyable whenever their base material is.
+- Unit coverage for block pricing, block base materials, ore/mineral
+  classification and the four sell categories.
+
+### Changed
+
+- Explicit block price overrides were removed from `PriceGenerator`; blocks
+  now derive their price from the material instead of drifting from it.
+- Existing `prices.json` files are migrated once. The new `_version` field
+  marks the file as migrated, so later admin edits to block prices are kept.
+- The sell footer now uses its bottom row for the four categories, the sell
+  chest, close and the page arrows. The XP exchange shortcut remains in the
+  buy menu and `/exchange`.
+- Jar version is 26.2.3.
+
+### Verified
+
+- Unit tests: 55 passing.
+- Fabric 26.2 dedicated-server smoke test on Linux x86_64, Java 25:
+  - Fabric Loader 0.20.1, Fabric API 0.161.0+26.2
+  - mod initialized and all command roots registered
+  - 1,422 price entries, 100% filtered coverage
+  - block prices persisted at 8.90× their material price
+  - stock, forced restock and `stocks.json` verified
+  - Money Ore placement and overworld/nether generation verified
+  - `/mcstore setprice` and `/mcstore reload` verified
+- Release JAR is published as an asset of the `mcstore-26.2.3` release.
+
 ## 26.2.2 — 2026-10-23
 
 ### Added

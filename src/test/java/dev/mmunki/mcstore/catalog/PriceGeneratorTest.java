@@ -53,19 +53,37 @@ class PriceGeneratorTest {
     }
 
     @Test
+    void mineralBlocksAreEightPointNineTimesTheirBaseMaterial() {
+        PriceEntry ironBlock = PriceGenerator.defaultEntry("minecraft:iron_block");
+        assertEquals(8_900L, ironBlock.sellCents());
+        assertEquals(22_250L, ironBlock.buyCents());
+        assertEquals(RarityTier.UNCOMMON, ironBlock.rarity());
+
+        PriceEntry diamondBlock = PriceGenerator.defaultEntry("minecraft:diamond_block");
+        assertEquals(35_600L, diamondBlock.sellCents());
+        assertEquals(106_800L, diamondBlock.buyCents());
+        assertEquals(RarityTier.RARE, diamondBlock.rarity());
+
+        PriceEntry rawIronBlock = PriceGenerator.defaultEntry("minecraft:raw_iron_block");
+        assertEquals(7_120L, rawIronBlock.sellCents());
+        assertEquals(17_800L, rawIronBlock.buyCents());
+
+        PriceEntry netheriteBlock = PriceGenerator.defaultEntry("minecraft:netherite_block");
+        assertEquals(200_250L, netheriteBlock.sellCents());
+        assertEquals(801_000L, netheriteBlock.buyCents());
+        assertEquals(RarityTier.LEGENDARY, netheriteBlock.rarity());
+    }
+
+    @Test
     void explicitOverridesStayInsideTheirRarityBand() {
         List<String> ids = List.of(
                 "minecraft:coal", "minecraft:charcoal", "minecraft:copper_ingot",
-                "minecraft:raw_copper", "minecraft:raw_copper_block", "minecraft:copper_block",
-                "minecraft:iron_ingot", "minecraft:raw_iron", "minecraft:raw_iron_block",
-                "minecraft:iron_block", "minecraft:gold_ingot", "minecraft:raw_gold",
-                "minecraft:raw_gold_block", "minecraft:gold_block", "minecraft:redstone",
-                "minecraft:redstone_block", "minecraft:lapis_lazuli", "minecraft:lapis_block",
-                "minecraft:quartz", "minecraft:quartz_block", "minecraft:diamond",
-                "minecraft:diamond_block", "minecraft:emerald", "minecraft:emerald_block",
-                "minecraft:amethyst_shard", "minecraft:amethyst_block", "minecraft:sulfur",
+                "minecraft:raw_copper", "minecraft:iron_ingot", "minecraft:raw_iron",
+                "minecraft:gold_ingot", "minecraft:raw_gold", "minecraft:redstone",
+                "minecraft:lapis_lazuli", "minecraft:quartz", "minecraft:diamond",
+                "minecraft:emerald", "minecraft:amethyst_shard", "minecraft:sulfur",
                 "minecraft:potent_sulfur", "minecraft:cinnabar", "minecraft:ancient_debris",
-                "minecraft:netherite_scrap", "minecraft:netherite_ingot", "minecraft:netherite_block",
+                "minecraft:netherite_scrap", "minecraft:netherite_ingot",
                 "minecraft:elytra", "minecraft:enchanted_book", "minecraft:nether_star",
                 "minecraft:dragon_egg", "minecraft:totem_of_undying", "minecraft:trident",
                 "minecraft:beacon", "minecraft:enchanted_golden_apple", "minecraft:heavy_core",
@@ -88,6 +106,13 @@ class PriceGeneratorTest {
                         id + " buy above 4x sell");
             }
         }
+    }
+
+    @Test
+    void storageBlocksOfOresAreBuyable() {
+        assertTrue(PriceGenerator.defaultEntry("minecraft:coal_block").buyable());
+        assertTrue(PriceGenerator.defaultEntry("minecraft:raw_iron_block").buyable());
+        assertTrue(PriceGenerator.defaultEntry("minecraft:netherite_block").buyable());
     }
 
     @Test

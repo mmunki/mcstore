@@ -44,6 +44,8 @@ public final class StoreCommands {
 
         dispatcher.register(Commands.literal("sell")
                 .executes(context -> openStore(context.getSource(), store, StoreMenu.Mode.SELL))
+                .then(Commands.literal("chest")
+                        .executes(context -> openStore(context.getSource(), store, StoreMenu.Mode.SELL_CHEST)))
                 .then(Commands.literal("hand").executes(context -> sellHand(context.getSource(), service)))
                 .then(Commands.literal("all").executes(context -> sellAll(context.getSource(), service))));
 

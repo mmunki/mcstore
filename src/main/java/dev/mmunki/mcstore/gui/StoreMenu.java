@@ -3,6 +3,7 @@ package dev.mmunki.mcstore.gui;
 import dev.mmunki.mcstore.McStore;
 import dev.mmunki.mcstore.catalog.ItemClassifier;
 import dev.mmunki.mcstore.catalog.RarityTier;
+import dev.mmunki.mcstore.catalog.SellCategory;
 import dev.mmunki.mcstore.config.PriceEntry;
 import dev.mmunki.mcstore.economy.ExchangeService;
 import dev.mmunki.mcstore.economy.Money;
@@ -18,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -36,6 +38,7 @@ public final class StoreMenu extends ChestMenu {
     public enum Mode {
         BUY("Buy"),
         SELL("Sell"),
+        SELL_CHEST("Sell Chest"),
         EXCHANGE("XP Exchange"),
         EDIT("Price Editor");
 
@@ -51,6 +54,8 @@ public final class StoreMenu extends ChestMenu {
     }
 
     private static final int PAGE_SIZE = 45;
+    private static final int DEPOSIT_SLOTS = 45;
+    private static final int PLAYER_SLOT_START = 54;
     private static final int SLOT_PREV = 45;
     private static final int SLOT_INFO = 46;
     private static final int SLOT_MODE = 47;
@@ -70,6 +75,7 @@ public final class StoreMenu extends ChestMenu {
     private final Map<String, PriceEntry> draft = new LinkedHashMap<>();
     private boolean draftDirty;
     private boolean editingBuy = true;
+    private SellCategory sellCategory = SellCategory.ALL;
     private int page;
 
     public StoreMenu(int syncId, Inventory playerInventory, ServerPlayer player,
@@ -107,6 +113,17 @@ public final class StoreMenu extends ChestMenu {
         if (!(clickingPlayer instanceof ServerPlayer serverPlayer)) {
             return;
         }
+        if (mode == Mode.SELL_CHEST) {
+            MenuAction action = slotId >= 0 && slotId < 54 ? actions.get(slotId) : null;
+            if (action != null) {
+                if (input == ContainerInput.PICKUP || input == ContainerInput.QUICK_MOVE) {
+                    action.run(serverPlayer, button, input == ContainerInput.QUICK_MOVE);
+                }
+                return;
+            }
+            super.clicked(slotId, button, input, clickingPlayer);
+            return;
+        }
         if (slotId < 0 || slotId >= 54) {
             return;
         }
@@ -123,11 +140,51 @@ public final class StoreMenu extends ChestMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        return ItemStack.EMPTY;
+        if (mode != Mode.SELL_CHEST) {
+            return ItemStack.EMPTY;
+        }
+        if (index < 0 || index >= slots.size()) {
+            return ItemStack.EMPTY;
+        }
+        Slot slot = slots.get(index);
+        if (slot == null || !slot.hasItem()) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack stack = slot.getItem();
+        ItemStack original = stack.copy();
+        if (index < DEPOSIT_SLOTS) {
+            if (!moveItemStackTo(stack, PLAYER_SLOT_START, slots.size(), true)) {
+                return ItemStack.EMPTY;
+            }
+        } else if (!moveItemStackTo(stack, 0, DEPOSIT_SLOTS, false)) {
+            return ItemStack.EMPTY;
+        }
+        if (stack.isEmpty()) {
+            slot.set(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+        if (stack.getCount() == original.getCount()) {
+            return ItemStack.EMPTY;
+        }
+        slot.onTake(player, stack);
+        return original;
+    }
+
+    @Override
+    public void removed(Player player) {
+        if (mode == Mode.SELL_CHEST) {
+            returnContents(player);
+        }
+        super.removed(player);
     }
 
     private void rebuild() {
         actions.clear();
+        if (mode == Mode.SELL_CHEST) {
+            buildSellChest();
+            return;
+        }
         for (int slot = 0; slot < 54; slot++) {
             container.setItem(slot, GuiUtil.filler());
         }
@@ -184,6 +241,8 @@ public final class StoreMenu extends ChestMenu {
 
         if (mode == Mode.EDIT) {
             buildEditFooter();
+        } else if (mode == Mode.SELL) {
+            buildSellFooter(entries.size());
         } else {
             buildStoreFooter(entries.size());
         }
@@ -210,6 +269,121 @@ public final class StoreMenu extends ChestMenu {
                 ChatFormatting.YELLOW,
                 List.of("Stock is consumed by buying and replenished by selling.",
                         "A full restock refills every market item.")));
+    }
+
+    private void buildSellFooter(int count) {
+        long balance = store.balances().balance(player.getUUID());
+        int maxPage = Math.max(0, (count - 1) / PAGE_SIZE);
+        container.setItem(SLOT_INFO, GuiUtil.icon(Items.GOLD_INGOT, "Balance: " + Money.format(balance),
+                ChatFormatting.GOLD,
+                List.of(count + " " + sellCategory.displayName().toLowerCase(java.util.Locale.ROOT)
+                                + " items shown",
+                        "Page " + (page + 1) + " / " + (maxPage + 1))));
+        categoryButton(SLOT_MODE, SellCategory.ORES, Items.RAW_IRON);
+        categoryButton(SLOT_ACTION, SellCategory.BLOCKS, Items.IRON_BLOCK);
+        categoryButton(SLOT_CLOSE, SellCategory.MINERALS, Items.DIAMOND);
+        categoryButton(SLOT_STATUS, SellCategory.ALL, Items.CHEST);
+        container.setItem(51, GuiUtil.icon(Items.ENDER_CHEST, "Open sell chest", ChatFormatting.AQUA,
+                List.of("Deposit any blocks, ores or items.",
+                        "Sell one, a stack, the chest or your inventory.")));
+        actions.put(51, (clicker, button, shift) -> open(clicker, store, Mode.SELL_CHEST));
+        container.setItem(52, GuiUtil.icon(Items.BARRIER, "Close", ChatFormatting.RED,
+                List.of("Return to the game.")));
+        actions.put(52, (clicker, button, shift) -> clicker.closeContainer());
+    }
+
+    private void categoryButton(int slot, SellCategory category, Item item) {
+        boolean selected = sellCategory == category;
+        ChatFormatting color = selected ? ChatFormatting.AQUA : ChatFormatting.WHITE;
+        container.setItem(slot, GuiUtil.icon(item,
+                category.displayName() + (selected ? " (selected)" : ""), color,
+                List.of(selected ? "Showing this category." : "Click to show this category.",
+                        "Categories: ores, blocks, minerals, all.")));
+        actions.put(slot, (clicker, button, shift) -> {
+            sellCategory = category;
+            page = 0;
+            rebuild();
+            broadcastChanges();
+        });
+    }
+
+    private void buildSellChest() {
+        for (int slot = DEPOSIT_SLOTS; slot < 54; slot++) {
+            container.setItem(slot, GuiUtil.filler());
+        }
+        container.setItem(45, GuiUtil.icon(Items.ARROW, "Back to Sell", ChatFormatting.WHITE,
+                List.of("Return to the category menu.",
+                        "Items left in the chest go back to you.")));
+        actions.put(45, (clicker, button, shift) -> {
+            returnContents(clicker);
+            open(clicker, store, Mode.SELL);
+        });
+        sellChestButton(46, Items.GOLD_NUGGET, "Sell 1 of each", 1,
+                "Sell a single unit from every item type in the chest.");
+        sellChestButton(47, Items.GOLD_INGOT, "Sell a stack of each", 64,
+                "Sell up to one stack of every item type in the chest.");
+        sellChestButton(48, Items.CHEST, "Sell everything in the chest", 0,
+                "Sell every sellable item deposited in the chest.");
+        container.setItem(49, GuiUtil.icon(Items.ENDER_CHEST, "Sell entire inventory",
+                ChatFormatting.LIGHT_PURPLE,
+                List.of("Sells every sellable item you carry.",
+                        "The chest contents stay in the chest.")));
+        actions.put(49, (clicker, button, shift) -> {
+            if (service.sellAll(clicker)) {
+                rebuild();
+                broadcastChanges();
+            }
+        });
+        container.setItem(50, GuiUtil.icon(Items.DIAMOND, "Sell held item", ChatFormatting.AQUA,
+                List.of("Sell the stack in your main hand.")));
+        actions.put(50, (clicker, button, shift) -> {
+            if (service.sellHand(clicker)) {
+                rebuild();
+                broadcastChanges();
+            }
+        });
+        container.setItem(51, GuiUtil.icon(Items.HOPPER, "Return chest items", ChatFormatting.YELLOW,
+                List.of("Move the chest contents back to your inventory.")));
+        actions.put(51, (clicker, button, shift) -> {
+            returnContents(clicker);
+            rebuild();
+            broadcastChanges();
+        });
+        container.setItem(52, GuiUtil.icon(Items.PAPER, "Sell chest", ChatFormatting.WHITE,
+                List.of("Put items in the top 45 slots.",
+                        "Nothing is sold until you click a button.")));
+        container.setItem(53, GuiUtil.icon(Items.BARRIER, "Close", ChatFormatting.RED,
+                List.of("Return to the game.",
+                        "Any remaining items go back to you.")));
+        actions.put(53, (clicker, button, shift) -> {
+            returnContents(clicker);
+            clicker.closeContainer();
+        });
+    }
+
+    private void sellChestButton(int slot, Item item, String name, int limit, String description) {
+        container.setItem(slot, GuiUtil.icon(item, name, ChatFormatting.GREEN,
+                List.of(description, "Only items the market is buying are sold.")));
+        actions.put(slot, (clicker, button, shift) -> {
+            if (service.sellContainer(clicker, container, limit)) {
+                rebuild();
+                broadcastChanges();
+            }
+        });
+    }
+
+    private void returnContents(Player player) {
+        for (int slot = 0; slot < DEPOSIT_SLOTS; slot++) {
+            ItemStack stack = container.getItem(slot);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            container.setItem(slot, ItemStack.EMPTY);
+            if (!player.getInventory().add(stack)) {
+                player.drop(stack, false);
+            }
+        }
+        container.setChanged();
     }
 
     private void buildExchange() {
@@ -328,6 +502,8 @@ public final class StoreMenu extends ChestMenu {
             case EXCHANGE -> {
                 // handled by the exchange offers, not by item entries
             }
+            case SELL_CHEST -> {
+            }
         }
     }
 
@@ -426,7 +602,10 @@ public final class StoreMenu extends ChestMenu {
     private List<PriceEntry> entriesForMode() {
         return switch (mode) {
             case BUY -> store.buyableEntries();
-            case SELL -> store.sellableEntries();
+            case SELL -> store.sellableEntries().stream()
+                    .filter(entry -> sellCategory.matches(entry.itemId()))
+                    .toList();
+            case SELL_CHEST -> List.of();
             case EXCHANGE -> List.of();
             case EDIT -> new ArrayList<>(draft.values());
         };

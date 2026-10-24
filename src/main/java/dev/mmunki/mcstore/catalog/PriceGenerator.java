@@ -36,6 +36,15 @@ public final class PriceGenerator {
 
     public static PriceEntry defaultEntry(String itemId) {
         String path = ItemClassifier.path(itemId);
+        String blockBase = ItemClassifier.blockBase(itemId);
+        if (blockBase != null) {
+            int colon = itemId.indexOf(':');
+            String namespace = colon >= 0 ? itemId.substring(0, colon + 1) : "minecraft:";
+            PriceEntry base = defaultEntry(namespace + blockBase);
+            long sell = blockPrice(base.sellCents());
+            Long buy = base.buyCents() == null ? null : blockPrice(base.buyCents());
+            return new PriceEntry(itemId, base.rarity(), buy, sell);
+        }
         PriceDefaults override = OVERRIDES.get(path);
         RarityTier rarity = override != null ? override.rarity() : ItemClassifier.rarity(itemId);
         long sell = override != null ? override.sellCents() : rarity.defaultSellCents(itemId);
@@ -48,42 +57,33 @@ public final class PriceGenerator {
         return new PriceEntry(itemId, rarity, buy, sell);
     }
 
+    private static long blockPrice(long materialCents) {
+        return Math.max(1L, Math.round(materialCents * ItemClassifier.mineralBlockMultiplier()));
+    }
+
     private static Map<String, PriceDefaults> buildOverrides() {
         Map<String, PriceDefaults> map = new LinkedHashMap<>();
         put(map, "coal", RarityTier.COMMON, 300L, 600L);
         put(map, "charcoal", RarityTier.COMMON, 200L, 500L);
         put(map, "copper_ingot", RarityTier.COMMON, 450L, 1_200L);
         put(map, "raw_copper", RarityTier.COMMON, 400L, 1_000L);
-        put(map, "raw_copper_block", RarityTier.COMMON, 500L, 1_000L);
-        put(map, "copper_block", RarityTier.COMMON, 500L, 1_000L);
         put(map, "iron_ingot", RarityTier.UNCOMMON, 1_000L, 2_500L);
         put(map, "raw_iron", RarityTier.UNCOMMON, 800L, 2_000L);
-        put(map, "raw_iron_block", RarityTier.UNCOMMON, 1_200L, 3_000L);
-        put(map, "iron_block", RarityTier.UNCOMMON, 1_500L, 3_750L);
         put(map, "gold_ingot", RarityTier.RARE, 2_000L, 6_000L);
         put(map, "raw_gold", RarityTier.RARE, 1_800L, 5_400L);
-        put(map, "raw_gold_block", RarityTier.RARE, 3_000L, 9_000L);
-        put(map, "gold_block", RarityTier.RARE, 3_500L, 10_500L);
         put(map, "redstone", RarityTier.UNCOMMON, 800L, 2_000L);
-        put(map, "redstone_block", RarityTier.UNCOMMON, 1_200L, 3_000L);
         put(map, "lapis_lazuli", RarityTier.UNCOMMON, 1_000L, 2_500L);
-        put(map, "lapis_block", RarityTier.UNCOMMON, 1_400L, 3_500L);
         put(map, "quartz", RarityTier.UNCOMMON, 900L, 2_250L);
-        put(map, "quartz_block", RarityTier.UNCOMMON, 1_300L, 3_250L);
         put(map, "diamond", RarityTier.RARE, 4_000L, 12_000L);
         put(map, "money_ore", RarityTier.RARE, 5_000L, 15_000L);
-        put(map, "diamond_block", RarityTier.EPIC, 9_000L, 31_500L);
         put(map, "emerald", RarityTier.RARE, 3_500L, 10_500L);
-        put(map, "emerald_block", RarityTier.EPIC, 8_000L, 28_000L);
         put(map, "amethyst_shard", RarityTier.RARE, 2_000L, 6_000L);
-        put(map, "amethyst_block", RarityTier.RARE, 3_800L, 11_400L);
         put(map, "sulfur", RarityTier.COMMON, 500L, 1_000L);
         put(map, "potent_sulfur", RarityTier.UNCOMMON, 1_200L, 3_000L);
         put(map, "cinnabar", RarityTier.UNCOMMON, 1_200L, 3_000L);
         put(map, "ancient_debris", RarityTier.EPIC, 9_500L, 33_250L);
         put(map, "netherite_scrap", RarityTier.EPIC, 9_000L, 31_500L);
         put(map, "netherite_ingot", RarityTier.LEGENDARY, 22_500L, 90_000L);
-        put(map, "netherite_block", RarityTier.LEGENDARY, 25_000L, 100_000L);
         put(map, "elytra", RarityTier.LEGENDARY, 25_000L, null);
         put(map, "enchanted_book", RarityTier.EPIC, 7_500L, null);
         put(map, "nether_star", RarityTier.LEGENDARY, 25_000L, null);

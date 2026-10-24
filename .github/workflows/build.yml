@@ -39,8 +39,8 @@ jobs:
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: mcstore-26.2.1
-          path: build/libs/MCStore-26.2.1.jar
+          name: mcstore-26.2.3
+          path: build/libs/MCStore-26.2.3.jar
           if-no-files-found: error
 
       - name: Upload smoke-test report

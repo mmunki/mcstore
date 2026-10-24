@@ -22,6 +22,31 @@ public final class ItemClassifier {
             "test_block", "test_instance_block"
     );
 
+    private static final double MINERAL_BLOCK_MULTIPLIER = 8.90d;
+
+    private static final Map<String, String> MINERAL_BLOCK_BASE = Map.ofEntries(
+            Map.entry("coal_block", "coal"),
+            Map.entry("copper_block", "copper_ingot"),
+            Map.entry("raw_copper_block", "raw_copper"),
+            Map.entry("iron_block", "iron_ingot"),
+            Map.entry("raw_iron_block", "raw_iron"),
+            Map.entry("gold_block", "gold_ingot"),
+            Map.entry("raw_gold_block", "raw_gold"),
+            Map.entry("redstone_block", "redstone"),
+            Map.entry("lapis_block", "lapis_lazuli"),
+            Map.entry("quartz_block", "quartz"),
+            Map.entry("amethyst_block", "amethyst_shard"),
+            Map.entry("diamond_block", "diamond"),
+            Map.entry("emerald_block", "emerald"),
+            Map.entry("netherite_block", "netherite_ingot")
+    );
+
+    private static final Set<String> MINERAL_FORMS = Set.of(
+            "coal", "charcoal", "diamond", "emerald", "lapis_lazuli", "quartz",
+            "amethyst_shard", "redstone", "glowstone_dust", "sulfur",
+            "potent_sulfur", "cinnabar", "netherite_scrap"
+    );
+
     private static final Set<String> BUYABLE_EXACT = Set.of(
             "coal", "charcoal", "raw_coal",
             "copper_ingot", "raw_copper", "raw_copper_block", "copper_block",
@@ -143,16 +168,49 @@ public final class ItemClassifier {
         if (isBlacklisted(itemId)) {
             return false;
         }
+        if (isMineralBlock(path)) {
+            return true;
+        }
         if (BUYABLE_EXACT.contains(path)) {
             return true;
         }
-        if (path.endsWith("_ore") || path.startsWith("raw_")) {
+        if (isOre(path)) {
             return true;
         }
         if (path.endsWith("_ingot") || path.endsWith("_nugget") || path.endsWith("_scrap")) {
             return true;
         }
         return path.contains("ancient_debris");
+    }
+
+    public static String blockBase(String itemId) {
+        return MINERAL_BLOCK_BASE.get(path(itemId));
+    }
+
+    public static boolean isMineralBlock(String itemId) {
+        return blockBase(itemId) != null;
+    }
+
+    public static double mineralBlockMultiplier() {
+        return MINERAL_BLOCK_MULTIPLIER;
+    }
+
+    public static boolean isOre(String itemId) {
+        String path = path(itemId);
+        if (isMineralBlock(path)) {
+            return false;
+        }
+        return path.endsWith("_ore") || path.startsWith("raw_")
+                || path.equals("ancient_debris") || path.equals("money_ore");
+    }
+
+    public static boolean isMineral(String itemId) {
+        String path = path(itemId);
+        if (isOre(path) || isMineralBlock(path)) {
+            return true;
+        }
+        return path.endsWith("_ingot") || path.endsWith("_nugget")
+                || path.endsWith("_scrap") || MINERAL_FORMS.contains(path);
     }
 
     public static RarityTier rarity(String itemId) {

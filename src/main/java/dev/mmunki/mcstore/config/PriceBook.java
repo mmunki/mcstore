@@ -32,11 +32,13 @@ import java.util.TreeMap;
  */
 public final class PriceBook {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    public static final int CURRENT_VERSION = 2;
     private static final String COMMENT = "MCStore prices. Money is a decimal amount; "
             + "the runtime stores integer cents. Rarity is one of COMMON, UNCOMMON, RARE, EPIC, LEGENDARY. "
             + "Remove the buy field to make an item sell-only.";
 
     private final Map<String, PriceEntry> entries = new TreeMap<>();
+    private int version = CURRENT_VERSION;
 
     public static PriceBook load(Path path) throws IOException {
         PriceBook book = new PriceBook();
@@ -45,6 +47,7 @@ public final class PriceBook {
         }
         String json = JsonFiles.read(path);
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        int version = root.has("_version") ? root.get("_version").getAsInt() : 1;
         JsonObject items;
         if (root.has("items") && root.get("items").isJsonObject()) {
             items = root.getAsJsonObject("items");
@@ -72,7 +75,19 @@ public final class PriceBook {
             }
             book.entries.put(id, new PriceEntry(id, rarity, buy, sell));
         }
+        if (version < CURRENT_VERSION) {
+            book.upgradeMineralBlocks();
+        }
+        book.version = CURRENT_VERSION;
         return book;
+    }
+
+    private void upgradeMineralBlocks() {
+        for (String id : List.copyOf(entries.keySet())) {
+            if (ItemClassifier.isMineralBlock(id)) {
+                entries.put(id, PriceGenerator.defaultEntry(id));
+            }
+        }
     }
 
     private static long readCents(JsonElement element, long fallback) {
@@ -91,6 +106,7 @@ public final class PriceBook {
 
     public void save(Path path) throws IOException {
         JsonObject root = new JsonObject();
+        root.addProperty("_version", version);
         root.addProperty("_comment", COMMENT);
         JsonObject items = new JsonObject();
         for (PriceEntry entry : entries.values()) {
